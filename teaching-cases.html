@@ -1,0 +1,733 @@
+<title>Sixteen Cases</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+
+<style>
+  :root {
+    --ink: #16232b; --ink-soft: #2b3a41; --paper: #eef1f0; --surface: #ffffff; --surface-2: #e4e9e7;
+    --line: #d4dad9; --line-strong: #b7c0be; --muted: #5c6d6e;
+    --accent: #0e7a70; --accent-ink: #ffffff; --accent-soft: #dcefec;
+    --acidemic: #a8402a; --acidemic-soft: #f7e3de;
+    --alkalotic: #3d519c; --alkalotic-soft: #e2e6f5;
+    --normalstate: #3d7f52; --normalstate-soft: #dcefe1;
+    --warn: #96601b; --warn-soft: #f6ead3;
+    --focus: #0e7a70;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #e7edec; --ink-soft: #c4cfce; --paper: #10181a; --surface: #172124; --surface-2: #1e2b2e;
+      --line: #2c3a3d; --line-strong: #3c4d50; --muted: #93a4a3;
+      --accent: #4fc3b6; --accent-ink: #08211d; --accent-soft: #163330;
+      --acidemic: #e08a72; --acidemic-soft: #3a2420;
+      --alkalotic: #a3b1e6; --alkalotic-soft: #232a47;
+      --normalstate: #8fd1a3; --normalstate-soft: #1c3423;
+      --warn: #e3b567; --warn-soft: #3a2e15;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #e7edec; --ink-soft: #c4cfce; --paper: #10181a; --surface: #172124; --surface-2: #1e2b2e;
+    --line: #2c3a3d; --line-strong: #3c4d50; --muted: #93a4a3;
+    --accent: #4fc3b6; --accent-ink: #08211d; --accent-soft: #163330;
+    --acidemic: #e08a72; --acidemic-soft: #3a2420;
+    --alkalotic: #a3b1e6; --alkalotic-soft: #232a47;
+    --normalstate: #8fd1a3; --normalstate-soft: #1c3423;
+    --warn: #e3b567; --warn-soft: #3a2e15;
+  }
+
+  * { box-sizing: border-box; }
+  body { background: var(--paper); color: var(--ink); font-family: "IBM Plex Sans", system-ui, sans-serif; line-height: 1.45; }
+  .mono, .val, table, code { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  h1, h2, h3 { text-wrap: balance; }
+  a { color: var(--accent); }
+
+  header.top { border-bottom: 1px solid var(--line); background: var(--surface); }
+  .top-inner { max-width: 1180px; margin: 0 auto; padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .top-inner h1 { margin: 0; font-size: 1.28rem; font-weight: 700; letter-spacing: -0.01em; }
+
+  .segmented { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 7px; overflow: hidden; }
+  .segmented > * {
+    font-family: "IBM Plex Sans", sans-serif; font-size: 0.86rem; font-weight: 500; padding: 7px 16px; border: 0;
+    background: var(--surface); color: var(--muted); cursor: pointer; text-decoration: none; display: inline-block;
+  }
+  .segmented > *.active { background: var(--accent); color: var(--accent-ink); cursor: default; }
+  .segmented > *:not(:last-child) { border-right: 1px solid var(--line-strong); }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 26px 20px 64px; }
+
+  .grid { display: grid; grid-template-columns: minmax(260px, 320px) 1fr; gap: 22px; align-items: start; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; }
+  .panel + .panel { margin-top: 18px; }
+  .panel h2 { margin: 0 0 4px; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .panel .sub { margin: 0 0 12px; font-size: 0.84rem; color: var(--muted); }
+
+  select#case-select {
+    width: 100%; font-family: "IBM Plex Sans", sans-serif; font-size: 0.92rem; padding: 9px 10px;
+    border: 1px solid var(--line-strong); border-radius: 7px; background: var(--paper); color: var(--ink);
+  }
+  .case-nav { display: flex; gap: 8px; margin-top: 10px; }
+  .case-nav .btn { flex: 1; }
+  .case-counter { text-align: center; font-size: 0.78rem; color: var(--muted); margin-top: 8px; }
+
+  .data-block { margin-top: 16px; }
+  .data-block .kicker { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 6px; }
+  .kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; font-size: 0.88rem; }
+  .kv-grid div.kv { display: flex; justify-content: space-between; border-bottom: 1px dotted var(--line); padding: 3px 0; }
+  .kv-grid .kv b { font-family: "IBM Plex Mono", monospace; }
+  .source-tag {
+    display: inline-block; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 8px;
+    border-radius: 999px; background: var(--surface-2); color: var(--muted); margin-bottom: 8px;
+  }
+
+  .stepper { display: flex; gap: 6px; margin-bottom: 18px; }
+  .stepper .step {
+    flex: 1; text-align: center; font-size: 0.76rem; font-weight: 600; padding: 8px 6px; border-radius: 7px;
+    background: var(--surface-2); color: var(--muted); border: 1px solid var(--line);
+  }
+  .stepper .step.done { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+  .stepper .step.current { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .stage { border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; background: var(--surface); }
+  .stage h3 { margin: 0 0 10px; font-size: 1.02rem; }
+  .stage .locked { color: var(--muted); font-size: 0.88rem; }
+
+  .quiz-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 4px; }
+  .quiz-btn {
+    font-family: "IBM Plex Sans", sans-serif; font-size: 0.86rem; font-weight: 600; padding: 9px 18px;
+    border-radius: 999px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); cursor: pointer;
+  }
+  .quiz-btn:hover { border-color: var(--accent); }
+  .quiz-btn.correct { background: var(--normalstate-soft); border-color: var(--normalstate); color: var(--normalstate); }
+  .quiz-btn.wrong { background: var(--acidemic-soft); border-color: var(--acidemic); color: var(--acidemic); }
+  .quiz-btn:disabled { cursor: default; opacity: 0.6; }
+  .quiz-feedback { font-size: 0.85rem; margin-top: 8px; }
+  .quiz-feedback.right { color: var(--normalstate); }
+  .quiz-feedback.close { color: var(--warn); }
+  .quiz-feedback.miss { color: var(--acidemic); }
+
+  .calc-row { display: flex; gap: 14px; flex-wrap: wrap; margin: 4px 0 12px; }
+  .calc-field { display: flex; flex-direction: column; gap: 4px; }
+  .calc-field label { font-size: 0.78rem; color: var(--muted); }
+  .calc-field input {
+    width: 150px; border: 1px solid var(--line-strong); border-radius: 6px; padding: 8px 10px; font-size: 0.95rem;
+    font-family: "IBM Plex Mono", monospace; background: var(--paper); color: var(--ink);
+  }
+  .calc-field input:focus { outline: 2px solid var(--focus); outline-offset: 1px; border-color: var(--focus); }
+  .calc-field input:disabled { opacity: 0.6; }
+  .calc-feedback { display: flex; flex-direction: column; gap: 4px; margin-bottom: 4px; }
+
+  .reveal-body { margin-top: 4px; }
+  .state-pill { font-size: 1rem; font-weight: 700; padding: 8px 18px; border-radius: 999px; display: inline-block; }
+  .state-pill.acidemic { background: var(--acidemic-soft); color: var(--acidemic); }
+  .state-pill.alkalotic { background: var(--alkalotic-soft); color: var(--alkalotic); }
+  .state-pill.normalstate { background: var(--normalstate-soft); color: var(--normalstate); }
+
+  .metric-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 12px 0; }
+  .metric { border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; }
+  .metric .m-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  .metric .m-value { font-size: 1.15rem; font-weight: 600; margin-top: 2px; }
+  .metric.flag-high .m-value { color: var(--acidemic); }
+  .metric.flag-low .m-value { color: var(--alkalotic); }
+  .metric.flag-ok .m-value { color: var(--normalstate); }
+
+  .process-card { border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; padding: 11px 13px; margin-top: 10px; }
+  .process-card.acidosis { border-left-color: var(--acidemic); }
+  .process-card.alkalosis { border-left-color: var(--alkalotic); }
+  .process-card .p-title { font-weight: 600; font-family: "IBM Plex Sans", sans-serif; }
+  .process-card .p-detail { font-size: 0.85rem; color: var(--ink-soft); margin-top: 5px; }
+  .process-card .p-formula { font-size: 0.79rem; color: var(--muted); margin-top: 5px; border-top: 1px dashed var(--line); padding-top: 5px; }
+  .fit-yes { color: var(--normalstate); font-weight: 600; }
+  .fit-no { color: var(--acidemic); font-weight: 600; }
+  .nodisorder { color: var(--normalstate); font-weight: 600; }
+
+  /* stepwise interpretation */
+  .step-card { border: 1px solid var(--line); border-radius: 10px; padding: 13px 15px; margin-top: 12px; }
+  .step-head { display: flex; align-items: flex-start; gap: 11px; }
+  .step-num {
+    flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--accent-soft); color: var(--accent);
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.82rem;
+    font-family: "IBM Plex Mono", monospace;
+  }
+  .step-title { font-weight: 700; font-size: 0.94rem; }
+  .step-sub { font-size: 0.76rem; color: var(--muted); margin-top: 2px; }
+  .step-body { margin-top: 9px; font-size: 0.86rem; color: var(--ink-soft); }
+  .step-body .process-card:first-child { margin-top: 9px; }
+  .step-verdict { font-weight: 600; margin-top: 6px; color: var(--ink); }
+  .step-verdict.flag { color: var(--acidemic); }
+  .step-verdict.ok { color: var(--normalstate); }
+
+  .stem-box { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 8px; padding: 12px 14px; font-size: 0.92rem; color: var(--ink-soft); margin-bottom: 12px; }
+  .stem-box b { color: var(--accent); }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip { font-size: 0.78rem; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-soft); padding: 4px 10px; border-radius: 999px; }
+
+  .btn {
+    font-family: "IBM Plex Sans", sans-serif; font-size: 0.85rem; font-weight: 600; padding: 8px 14px;
+    border-radius: 7px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); cursor: pointer;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .btn.primary:hover { opacity: 0.92; color: var(--accent-ink); }
+  .btn:disabled { opacity: 0.45; cursor: default; }
+  .btn:disabled:hover { border-color: var(--line-strong); color: var(--ink); }
+  .btn:focus-visible, select:focus-visible, .quiz-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  footer.site { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.8rem; }
+  footer.site a { color: var(--muted); }
+</style>
+
+<header class="top">
+  <div class="top-inner">
+    <h1>Sixteen Cases</h1>
+    <div class="segmented" role="group" aria-label="Page">
+      <a href="index.html">Analyzer</a>
+      <span class="active">Learning Cases</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="grid">
+    <!-- CASE PICKER -->
+    <div>
+      <section class="panel">
+        <h2>Pick a case</h2>
+        <p class="sub">Labs first, diagnosis last &mdash; work the gas before the history reveals itself.</p>
+        <select id="case-select"></select>
+        <div class="case-nav">
+          <button class="btn" id="prev-case">&larr; Prev</button>
+          <button class="btn" id="next-case">Next &rarr;</button>
+        </div>
+        <div class="case-counter" id="case-counter"></div>
+
+        <div class="data-block">
+          <span class="source-tag" id="source-tag"></span>
+          <div class="kicker">Blood gas</div>
+          <div class="kv-grid" id="gas-kv"></div>
+        </div>
+        <div class="data-block">
+          <div class="kicker">CMP</div>
+          <div class="kv-grid" id="cmp-kv"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- WALKTHROUGH -->
+    <div>
+      <div class="stepper">
+        <div class="step" id="stepper-state">1 &middot; State</div>
+        <div class="step" id="stepper-process">2 &middot; Process</div>
+        <div class="step" id="stepper-story">3 &middot; Story</div>
+      </div>
+
+      <div class="stage" id="stage-state">
+        <h3>State &mdash; what is the patient's pH doing?</h3>
+        <div id="state-quiz"></div>
+        <div id="state-reveal" class="reveal-body" hidden></div>
+      </div>
+
+      <div class="stage" id="stage-process">
+        <h3>Process &mdash; what mechanism(s) explain it?</h3>
+        <div id="process-locked" class="locked">Work through State first.</div>
+        <div id="process-quiz" hidden>
+          <p class="sub" style="margin:0 0 4px;">Calculate the AG and SID while also interpreting the PaCO&#8322; in the context of the HCO3.</p>
+          <div class="calc-row">
+            <div class="calc-field"><label for="guess-ag">Anion gap (Na &minus; Cl &minus; HCO&#8323;&#8315;)</label><input id="guess-ag" type="number" step="0.1" inputmode="decimal"></div>
+            <div class="calc-field"><label for="guess-sid">SID (Na &minus; Cl)</label><input id="guess-sid" type="number" step="0.1" inputmode="decimal"></div>
+          </div>
+          <div id="calc-feedback" class="calc-feedback"></div>
+          <button class="btn primary" id="check-work-btn">Check my work</button>
+        </div>
+        <div id="process-body" hidden></div>
+      </div>
+
+      <div class="stage" id="stage-story">
+        <h3>Story &mdash; what patient explains all of the above?</h3>
+        <div id="story-locked" class="locked">Work through Process first.</div>
+        <div id="story-body" hidden></div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site">
+    Companion to <a href="index.html">State, Process, Story</a>, the bedside analyzer. Same engine, same 16 verified vignettes &mdash; here for teaching rather than charting. Framework: Dr. Sara Crager, <a href="https://www.criticalcaretime.com/episodes/art-lines-t4k5m-ht3hb" target="_blank" rel="noopener">Critical Care Time&nbsp;episode&nbsp;84</a>. Educational use only, not a substitute for clinical judgment.
+  </footer>
+</div>
+
+<script>
+"use strict";
+
+/* ============================== ALGORITHM (identical engine to the analyzer) ============================== */
+function round(x, d) { d = d===undefined?1:d; const f = Math.pow(10,d); return Math.round(x*f)/f; }
+function convertVenousToArterial(pH, pCO2, HCO3) { return { pH: round(pH+0.03,3), pCO2: round(pCO2-5,1), HCO3: round(HCO3-1.5,1) }; }
+function correctedCalcium(ca, albumin) { return round(ca + 0.8*(4.0-albumin), 2); }
+function anionGap(Na, Cl, HCO3) { return round(Na - Cl - HCO3, 1); }
+function correctedAG(AG, albumin) { return round(AG + 2.5*(4.0-albumin), 1); }
+function expectedNormalAG(albumin) { return round(3*albumin, 1); }
+function SID(Na, Cl) { return round(Na - Cl, 1); }
+function classifySID(sid) { if (sid < 38) return "low"; if (sid > 40) return "high"; return "normal"; }
+function stateOf(pH) { if (pH < 7.35) return "Acidemic"; if (pH > 7.45) return "Alkalotic"; return "Normal"; }
+function winterExpected(HCO3) { const mid = 1.5*HCO3+8; return { lo: round(mid-2,1), hi: round(mid+2,1), mid: round(mid,1) }; }
+function metAlkalosisExpected(HCO3) { const mid = 0.7*HCO3+20; return { lo: round(mid-1.5,1), hi: round(mid+1.5,1), mid: round(mid,1) }; }
+function acuteRespAcidosisExpectedHCO3(pCO2) { const d=pCO2-40; const mid=24+0.1*d; return { lo: round(mid-2,1), hi: round(mid+2,1), mid: round(mid,1) }; }
+function chronicRespAcidosisExpectedHCO3(pCO2) { const d=pCO2-40; const mid=24+0.4*d; return { lo: round(mid-3,1), hi: round(mid+3,1), mid: round(mid,1) }; }
+function acuteRespAlkalosisExpectedHCO3(pCO2) { const d=40-pCO2; const mid=24-0.2*d; return { lo: round(mid-2,1), hi: round(mid+2,1), mid: round(mid,1) }; }
+function chronicRespAlkalosisExpectedHCO3(pCO2) { const d=40-pCO2; const mid=24-0.45*d; return { lo: round(mid-3,1), hi: round(mid+3,1), mid: round(mid,1) }; }
+function inRange(v, r) { return v >= r.lo && v <= r.hi; }
+function pHPearlExpectedPCO2(pH) { return Math.round((pH % 1) * 100); }
+
+function analyze(input) {
+  const source = input.source, pHin = input.pH, pCO2in = input.pCO2, HCO3gasIn = input.HCO3gas;
+  const Na = input.Na, Cl = input.Cl, K = input.K, Ca = input.Ca, Albumin = input.Albumin, HCO3cmp = input.HCO3cmp;
+  let pH, pCO2, HCO3gas, conversion = null;
+  if (source === "venous") {
+    const c = convertVenousToArterial(pHin, pCO2in, HCO3gasIn);
+    pH = c.pH; pCO2 = c.pCO2; HCO3gas = c.HCO3;
+    conversion = { raw: { pH: pHin, pCO2: pCO2in, HCO3: HCO3gasIn }, converted: c };
+  } else { pH = pHin; pCO2 = pCO2in; HCO3gas = HCO3gasIn; }
+  const HCO3forAG = (HCO3cmp !== null && HCO3cmp !== undefined) ? HCO3cmp : HCO3gas;
+  const gasCmpDiscrepancy = (HCO3cmp !== null && HCO3cmp !== undefined) && Math.abs(HCO3cmp - HCO3gas) > 3;
+  const st = stateOf(pH);
+  const AG = anionGap(Na, Cl, HCO3forAG);
+  const cAG = correctedAG(AG, Albumin);
+  const expNormalAG = expectedNormalAG(Albumin);
+  const hasHighAG = cAG > expNormalAG + 2;
+  const sid = SID(Na, Cl);
+  const sidClass = classifySID(sid);
+  const correctedCa = correctedCalcium(Ca, Albumin);
+  const pCO2Abnormal = pCO2 < 35 || pCO2 > 45;
+  const HCO3Abnormal = HCO3gas < 22 || HCO3gas > 26;
+  const processes = [];
+
+  if (hasHighAG) {
+    const deltaAG = cAG - expNormalAG;
+    const deltaHCO3 = 24 - HCO3gas;
+    let deltaRatio = null, deltaRatioCategory;
+    if (deltaHCO3 !== 0) {
+      deltaRatio = round(deltaAG/deltaHCO3, 2);
+      if (deltaRatio < 0.4) deltaRatioCategory = "non-gap-predominant";
+      else if (deltaRatio <= 0.8) deltaRatioCategory = "combined";
+      else if (deltaRatio <= 2) deltaRatioCategory = "pure-high-AG";
+      else deltaRatioCategory = "concurrent-alkalosis";
+    } else deltaRatioCategory = "concurrent-alkalosis";
+    processes.push({ type:"metabolic", label:"metabolic acidosis", subtype:"high AG", deltaRatio, deltaRatioCategory });
+    if (deltaRatioCategory === "combined") processes.push({ type:"metabolic", label:"metabolic acidosis", subtype:"non-gap", note:"delta ratio 0.4–0.8: HCO3 fell further than the gap alone predicts" });
+    else if (deltaRatioCategory === "concurrent-alkalosis") processes.push({ type:"metabolic", label:"metabolic alkalosis", note:"delta ratio > 2: HCO3 preserved beyond what the gap acid alone predicts" });
+    const expected = winterExpected(HCO3gas);
+    const fits = inRange(pCO2, expected);
+    processes[0].expectedResp = expected; processes[0].pearl = pHPearlExpectedPCO2(pH); processes[0].compensationAppropriate = fits;
+    if (!fits) processes.push({ type:"respiratory", label: pCO2 > expected.hi ? "respiratory acidosis" : "respiratory alkalosis", primary:true, secondaryTo:"metabolic acidosis", note: "measured PaCO2 " + pCO2 + " vs expected compensation " + expected.lo + "–" + expected.hi });
+  } else {
+    const metDir = HCO3gas < 22 ? "acidosis" : HCO3gas > 26 ? "alkalosis" : null;
+    const respDir = pCO2 > 45 ? "acidosis" : pCO2 < 35 ? "alkalosis" : null;
+    if (!metDir && !respDir) {
+      // no disorder
+    } else if (metDir && respDir && metDir === respDir) {
+      if (metDir === "acidosis") { processes.push({ type:"metabolic", label:"metabolic acidosis", subtype:"non-gap", combined:true }); processes.push({ type:"respiratory", label:"respiratory acidosis", primary:true, combined:true }); }
+      else { processes.push({ type:"metabolic", label:"metabolic alkalosis", combined:true }); processes.push({ type:"respiratory", label:"respiratory alkalosis", primary:true, combined:true }); }
+    } else {
+      const hypMet = metDir ? { dir: metDir, expected: metDir === "acidosis" ? winterExpected(HCO3gas) : metAlkalosisExpected(HCO3gas) } : null;
+      if (hypMet) hypMet.fits = inRange(pCO2, hypMet.expected);
+      const hypResp = respDir ? { dir: respDir, acute: respDir === "acidosis" ? acuteRespAcidosisExpectedHCO3(pCO2) : acuteRespAlkalosisExpectedHCO3(pCO2), chronic: respDir === "acidosis" ? chronicRespAcidosisExpectedHCO3(pCO2) : chronicRespAlkalosisExpectedHCO3(pCO2) } : null;
+      if (hypResp) { hypResp.fitsAcute = inRange(HCO3gas, hypResp.acute); hypResp.fitsChronic = inRange(HCO3gas, hypResp.chronic); hypResp.fits = hypResp.fitsAcute || hypResp.fitsChronic; }
+      const metDeviation = metDir ? Math.abs(HCO3gas-24)/2 : -Infinity;
+      const respDeviation = respDir ? Math.abs(pCO2-40)/5 : -Infinity;
+      const metIsBigger = metDeviation >= respDeviation;
+      let primary;
+      if (metDir && !respDir) primary = "met";
+      else if (respDir && !metDir) primary = "resp";
+      else if (hypResp.fits && !hypMet.fits) primary = "resp";
+      else if (hypMet.fits && !hypResp.fits) primary = "met";
+      else primary = metIsBigger ? "met" : "resp";
+      if (primary === "met") {
+        const label = hypMet.dir === "acidosis" ? "metabolic acidosis" : "metabolic alkalosis";
+        const p = { type:"metabolic", label, compensationAppropriate: hypMet.fits, expectedResp: hypMet.expected };
+        if (label === "metabolic acidosis") { p.subtype = "non-gap"; p.pearl = pHPearlExpectedPCO2(pH); }
+        processes.push(p);
+        if (!hypMet.fits) processes.push({ type:"respiratory", label: pCO2 > hypMet.expected.hi ? "respiratory acidosis" : "respiratory alkalosis", primary:true, secondaryTo:label, note: "measured PaCO2 " + pCO2 + " vs expected compensation " + hypMet.expected.lo + "–" + hypMet.expected.hi });
+      } else {
+        const label = hypResp.dir === "acidosis" ? "respiratory acidosis" : "respiratory alkalosis";
+        let duration;
+        if (hypResp.fitsAcute && !hypResp.fitsChronic) duration = "acute";
+        else if (hypResp.fitsChronic && !hypResp.fitsAcute) duration = "chronic";
+        else if (hypResp.fitsAcute && hypResp.fitsChronic) duration = "acute (indeterminate vs early chronic)";
+        else duration = "indeterminate";
+        processes.push({ type:"respiratory", label, primary:true, duration, acute: hypResp.acute, chronic: hypResp.chronic, compensationAppropriate: hypResp.fits });
+        if (!hypResp.fits) {
+          if (HCO3gas < hypResp.acute.lo && HCO3gas < hypResp.chronic.lo) processes.push({ type:"metabolic", label:"metabolic acidosis", subtype:"non-gap", secondaryTo: label, note: "HCO3 lower than expected renal compensation" });
+          else if (HCO3gas > hypResp.acute.hi && HCO3gas > hypResp.chronic.hi) processes.push({ type:"metabolic", label:"metabolic alkalosis", secondaryTo: label, note: "HCO3 higher than expected renal compensation" });
+        }
+      }
+    }
+  }
+  const noDisorder = processes.length === 0;
+  return { pH, pCO2, HCO3gas, conversion, gasCmpDiscrepancy, state: st, AG, correctedAG: cAG, expNormalAG, hasHighAG, sid, sidClass, correctedCa, processes, noDisorder, normalPHWithAbnormalGas: st === "Normal" && !noDisorder };
+}
+
+const DIFFERENTIALS = {
+  "metabolic acidosis|high AG": ["Ketoacidosis — diabetic, alcoholic, or starvation", "Lactic acidosis — shock, sepsis, hypoxia, seizure, metformin", "Uremia — renal failure", "Toxic alcohol / salicylate ingestion", "5-oxoproline — chronic acetaminophen use"],
+  "metabolic acidosis|non-gap": ["GI bicarbonate loss — diarrhea, ileostomy, fistula", "Renal tubular acidosis", "Large-volume 0.9% saline resuscitation", "Early renal failure", "Carbonic anhydrase inhibitor (acetazolamide)"],
+  "metabolic alkalosis": ["Vomiting / NG suction (chloride-responsive)", "Diuretic use (chloride-responsive)", "Post-hypercapnic overshoot", "Hyperaldosteronism / Cushing syndrome (chloride-resistant)", "Severe hypokalemia, Bartter/Gitelman syndromes"],
+  "respiratory acidosis|acute": ["Opioid or sedative overdose", "Neuromuscular weakness — Guillain-Barré, myasthenic crisis", "Acute airway obstruction", "Severe asthma / COPD exacerbation", "Flail chest, CNS event"],
+  "respiratory acidosis|chronic": ["COPD", "Obesity hypoventilation syndrome", "Chronic neuromuscular disease", "Severe kyphoscoliosis"],
+  "respiratory alkalosis|acute": ["Anxiety / voluntary hyperventilation", "Pain", "Pulmonary embolism", "Hypoxemia — pneumonia, high altitude, CHF", "Early salicylate toxicity, sepsis, pregnancy"],
+  "respiratory alkalosis|chronic": ["Chronic liver disease", "Pregnancy", "Chronic high-altitude residence", "Chronic hypoxemia — interstitial lung disease", "CNS lesion"],
+};
+function differentialFor(p) {
+  if (p.type === "metabolic" && p.label === "metabolic acidosis") return DIFFERENTIALS[p.label + "|" + (p.subtype || "")] || [];
+  if (p.type === "metabolic") return DIFFERENTIALS[p.label] || [];
+  if (p.type === "respiratory") { const dur = (p.duration||"").indexOf("chronic") === 0 ? "chronic" : "acute"; return DIFFERENTIALS[p.label + "|" + dur] || []; }
+  return [];
+}
+function processTitle(p) { let t = p.label; if (p.subtype) t += " (" + p.subtype + ")"; return t; }
+function fmtRange(r) { return r.lo + "–" + r.hi + " mmHg"; }
+function fmtRangeHCO3(r) { return r.lo + "–" + r.hi + " mmol/L"; }
+
+function renderProcessCard(p) {
+  const dirClass = p.label.indexOf("acidosis") !== -1 ? "acidosis" : "alkalosis";
+  let detail = "";
+  if (p.deltaRatioCategory) {
+    const ratioText = p.deltaRatio !== null ? p.deltaRatio : "n/a";
+    const catText = { "pure-high-AG": "pure high-anion-gap process", "combined": "combined high-AG and non-AG process", "non-gap-predominant": "non-anion-gap process predominates", "concurrent-alkalosis": "a concurrent metabolic alkalosis is masking part of the expected HCO3 fall" }[p.deltaRatioCategory];
+    detail += "Delta ratio = " + ratioText + " — " + catText + ".";
+  }
+  if (p.note) detail += (detail ? " " : "") + p.note + ".";
+  let formula = "";
+  if (p.expectedResp) {
+    const fitsHTML = p.compensationAppropriate ? '<span class="fit-yes">appropriate compensation</span>' : '<span class="fit-no">outside expected range</span>';
+    formula = "Expected PaCO&#8322; (Winter's) " + fmtRange(p.expectedResp) + " &middot; measured " + fitsHTML;
+    if (p.pearl !== undefined) formula += " &middot; pearl: last two digits of pH &asymp; " + p.pearl;
+  } else if (p.acute && p.chronic) {
+    const fitsHTML = p.compensationAppropriate ? '<span class="fit-yes">' + (p.duration||"") + '</span>' : '<span class="fit-no">outside acute &amp; chronic range</span>';
+    formula = "Acute " + fmtRangeHCO3(p.acute) + " &middot; chronic (10/4 rule) " + fmtRangeHCO3(p.chronic) + " &middot; " + fitsHTML;
+  }
+  return '<div class="process-card ' + dirClass + '"><div class="p-title">' + processTitle(p) + (p.duration ? " — " + p.duration : "") + '</div>' +
+    (detail ? '<div class="p-detail">' + detail + '</div>' : '') + (formula ? '<div class="p-formula">' + formula + '</div>' : '') + '</div>';
+}
+
+/* ============================== STEPWISE INTERPRETATION ============================== */
+/* (1) PaCO2 in the context of HCO3 — bedside pearl for metabolic acidosis is "expected
+   PaCO2 ≈ last two digits of pH"; higher than expected flags an additional respiratory
+   acidosis, lower flags an additional respiratory alkalosis — (2) anion gap — "where
+   there's a gap, there's an acidosis" — (3) strong ion difference — low (<38) flags a
+   non-anion-gap acidosis, high (>40) flags a metabolic alkalosis. Critical Care Time #84. */
+
+function stepWrap(num, title, sub, bodyHtml) {
+  return '<div class="step-card"><div class="step-head"><span class="step-num">' + num + '</span>' +
+    '<div><div class="step-title">' + title + '</div><div class="step-sub">' + sub + '</div></div></div>' +
+    '<div class="step-body">' + bodyHtml + '</div></div>';
+}
+function stepVerdict(kind, text) { return '<div class="step-verdict' + (kind ? " " + kind : "") + '">' + text + '</div>'; }
+
+function step1Preface(result) {
+  const procs = result.processes;
+  if (result.noDisorder) {
+    return stepVerdict("ok", "PaCO&#8322; (" + result.pCO2 + ") and HCO3 (" + result.HCO3gas + ") are both within normal limits.");
+  }
+  const combinedResp = procs.find(p => p.type === "respiratory" && p.combined);
+  const combinedMet = procs.find(p => p.type === "metabolic" && p.combined);
+  if (combinedResp && combinedMet) {
+    return stepVerdict("flag", "PaCO&#8322; and HCO3 are abnormal in the <em>same</em> direction &mdash; that's not compensation, it's two primary processes stacking additively.");
+  }
+  if (result.hasHighAG) {
+    const p0 = procs[0];
+    let html = '<div>Bedside pearl: expected PaCO&#8322; &asymp; last two digits of the pH. pH ' + result.pH.toFixed(2) + ' &rarr; expected &asymp; ' + p0.pearl +
+      ' (Winter&rsquo;s formula: ' + fmtRange(p0.expectedResp) + '). Measured PaCO&#8322; ' + result.pCO2 + '.</div>';
+    html += stepVerdict(p0.compensationAppropriate ? "ok" : "flag",
+      p0.compensationAppropriate ? "Matches &mdash; compensation is appropriate for this metabolic acidosis." :
+      (result.pCO2 > p0.expectedResp.hi ? "Higher than expected &mdash; an additional respiratory acidosis is present." : "Lower than expected &mdash; an additional respiratory alkalosis is present."));
+    return html;
+  }
+  const metPrimary = procs.find(p => p.type === "metabolic" && p.expectedResp && !p.combined);
+  if (metPrimary) {
+    let html;
+    if (metPrimary.pearl !== undefined) {
+      html = '<div>Bedside pearl: expected PaCO&#8322; &asymp; last two digits of the pH. pH ' + result.pH.toFixed(2) + ' &rarr; expected &asymp; ' + metPrimary.pearl +
+        ' (Winter&rsquo;s formula: ' + fmtRange(metPrimary.expectedResp) + '). Measured PaCO&#8322; ' + result.pCO2 + '.</div>';
+    } else {
+      html = '<div>Expected PaCO&#8322; for this HCO3 (0.7&times;HCO3+20) is ' + fmtRange(metPrimary.expectedResp) + '. Measured PaCO&#8322; ' + result.pCO2 +
+        '. (The last-two-digits-of-pH pearl is specific to metabolic acidosis and doesn&rsquo;t apply to alkalosis.)</div>';
+    }
+    html += stepVerdict(metPrimary.compensationAppropriate ? "ok" : "flag",
+      metPrimary.compensationAppropriate ? "Matches &mdash; compensation is appropriate." :
+      (result.pCO2 > metPrimary.expectedResp.hi ? "Higher than expected &mdash; an additional respiratory acidosis is present." : "Lower than expected &mdash; an additional respiratory alkalosis is present."));
+    return html;
+  }
+  const respPrimary = procs.find(p => p.type === "respiratory" && p.acute && p.chronic);
+  if (respPrimary) {
+    let html = '<div>PaCO&#8322; ' + result.pCO2 + ' is the primary abnormality here &mdash; does HCO3 (' + result.HCO3gas + ') fit the expected renal response? Acute ' +
+      fmtRangeHCO3(respPrimary.acute) + ' &middot; chronic (10/4 rule) ' + fmtRangeHCO3(respPrimary.chronic) + '.</div>';
+    html += stepVerdict(respPrimary.compensationAppropriate ? "ok" : "flag",
+      respPrimary.compensationAppropriate ? ("HCO3 fits the " + (respPrimary.duration || "expected") + " response.") :
+      "HCO3 is outside both the acute and chronic range &mdash; a superimposed metabolic process is present.");
+    return html;
+  }
+  return "";
+}
+
+function renderSteps(result) {
+  const step1Cards = result.processes.filter(p => p.type === "respiratory").map(p => renderProcessCard(p));
+  const step2Cards = result.processes.filter(p => p.type === "metabolic" && p.subtype === "high AG").map(p => renderProcessCard(p));
+  const step3Cards = result.processes.filter(p => p.type === "metabolic" && p.subtype !== "high AG").map(p => renderProcessCard(p));
+
+  const step1 = stepWrap(1, "PaCO&#8322; in the context of HCO3",
+    "Never read PaCO&#8322; against the lab reference range alone &mdash; read it against what this patient's HCO3 predicts.",
+    step1Preface(result) + step1Cards.join(""));
+
+  const step2 = stepWrap(2, "Anion gap",
+    "AG = Na &minus; Cl &minus; HCO3. &ldquo;Where there&rsquo;s a gap, there&rsquo;s an acidosis.&rdquo;",
+    '<div>AG ' + result.AG + ', corrected for albumin ' + result.correctedAG + ' (expected normal &asymp; ' + result.expNormalAG + ', 3&times;albumin).</div>' +
+    stepVerdict(result.hasHighAG ? "flag" : "ok", result.hasHighAG ?
+      "Elevated &mdash; a high-anion-gap metabolic acidosis is present, regardless of the pH." : "Not elevated &mdash; no anion-gap acidosis.") +
+    step2Cards.join(""));
+
+  const sidVerdictText = result.sidClass === "low" ? "Low (<38) &mdash; supports a non-anion-gap metabolic acidosis." :
+    result.sidClass === "high" ? "High (>40) &mdash; supports a metabolic alkalosis." : "Normal (38&ndash;40) &mdash; no additional signal.";
+  const step3 = stepWrap(3, "Strong ion difference",
+    "SID &asymp; Na &minus; Cl. Normal &asymp; 38&ndash;40.",
+    '<div>SID ' + result.sid + '.</div>' +
+    stepVerdict(result.sidClass === "normal" ? "ok" : "flag", sidVerdictText) +
+    step3Cards.join(""));
+
+  return step1 + step2 + step3;
+}
+
+/* ============================== 16 TEACHING VIGNETTES ============================== */
+function hhPH(pCO2, HCO3) { return 6.1 + Math.log10(HCO3 / (0.03 * pCO2)); }
+
+const CASES = [
+  { teaser: "Routine pre-op labs, asymptomatic", dx: "Normal acid–base status", stem: "34-year-old healthy volunteer, routine pre-operative labs before an elective knee scope. No symptoms.", story: "Nothing to explain — gas and chemistry are consistent with normal acid–base physiology. Included as the baseline every other case is read against.",
+    input:{source:"arterial",pH:7.40,pCO2:40,HCO3gas:24,Na:140,Cl:104,K:4.0,Ca:9.5,Albumin:4.0,HCO3cmp:24} },
+  { teaser: "T1DM, 2 days vomiting + polyuria, tachypneic", dx: "Diabetic ketoacidosis", stem: "22-year-old woman with type 1 diabetes, two days of vomiting, polyuria, and abdominal pain, now tachypneic with a fruity odor on her breath.", story: "Pure high-anion-gap metabolic acidosis from ketoacidosis, with respiratory compensation (Kussmaul breathing) landing exactly where Winter's formula predicts — no second process to chase.",
+    input:{source:"arterial",pH:7.15,pCO2:20,HCO3gas:8,Na:132,Cl:90,K:5.2,Ca:9.0,Albumin:3.5,HCO3cmp:8} },
+  { teaser: "5 days of watery diarrhea", dx: "GI bicarbonate loss", stem: "45-year-old man with five days of profuse watery diarrhea, otherwise previously well.", story: "Normal-anion-gap (hyperchloremic) metabolic acidosis from GI bicarbonate loss, appropriately compensated by hyperventilation. The hypokalemia fits GI losses better than a hyperkalemic RTA.",
+    input:{source:"arterial",pH:7.30,pCO2:30,HCO3gas:14,Na:138,Cl:112,K:3.2,Ca:9.2,Albumin:4.0,HCO3cmp:14} },
+  { teaser: "3 days vomiting, small bowel obstruction", dx: "Chloride-responsive metabolic alkalosis", stem: "60-year-old woman with three days of intractable vomiting from a small bowel obstruction.", story: "Chloride-responsive metabolic alkalosis from loss of gastric HCl, with the expected hypoventilatory response. The hypochloremic, hypokalemic pattern is the textbook picture of vomiting-driven alkalosis.",
+    input:{source:"arterial",pH:7.52,pCO2:48,HCO3gas:38,Na:140,Cl:88,K:3.0,Ca:9.6,Albumin:4.2,HCO3cmp:38} },
+  { teaser: "Found unresponsive, pinpoint pupils", dx: "Opioid overdose", stem: "28-year-old man found unresponsive with pinpoint pupils after a witnessed heroin injection.", story: "Acute respiratory acidosis from opioid-induced hypoventilation — too little time has passed for meaningful renal bicarbonate retention, so HCO3 is only just starting to rise.",
+    input:{source:"arterial",pH:7.25,pCO2:60,HCO3gas:26,Na:140,Cl:100,K:4.0,Ca:9.5,Albumin:4.0,HCO3cmp:26} },
+  { teaser: "Severe COPD, presenting at baseline", dx: "Chronic respiratory acidosis (COPD)", stem: "68-year-old man with severe COPD and a long history of CO2 retention, presenting at what his family says is his usual baseline.", story: "Chronic respiratory acidosis with renal bicarbonate retention right on the 10/4 rule — this is his normal, not an acute decompensation, which is exactly why the pH is only mildly low despite a PaCO2 of 70.",
+    input:{source:"arterial",pH:7.32,pCO2:70,HCO3gas:35,Na:140,Cl:93,K:4.2,Ca:9.4,Albumin:3.8,HCO3cmp:35} },
+  { teaser: "Sudden pleuritic chest pain after a flight", dx: "Pulmonary embolism (respiratory alkalosis)", stem: "26-year-old woman with sudden pleuritic chest pain and tachypnea after a long-haul flight, visibly anxious.", story: "Acute respiratory alkalosis. Anxiety alone could produce this picture, but the pleuritic pain and recent immobilization make pulmonary embolism the diagnosis that must not be missed.",
+    input:{source:"arterial",pH:7.52,pCO2:26,HCO3gas:21,Na:140,Cl:106,K:3.8,Ca:9.5,Albumin:4.0,HCO3cmp:21} },
+  { teaser: "Cirrhosis, routine outpatient labs, feels well", dx: "Chronic respiratory alkalosis of liver disease", stem: "55-year-old woman with cirrhosis, seen for routine outpatient labs. She feels well.", story: "Chronic respiratory alkalosis (the hyperventilation of chronic liver disease) with renal compensation bringing the pH essentially into the normal range. A normal pH here is quietly hiding a real, chronic process — exactly the trap take-home point #2 warns about.",
+    input:{source:"arterial",pH:7.44,pCO2:28,HCO3gas:19,Na:140,Cl:108,K:4.0,Ca:9.4,Albumin:4.0,HCO3cmp:19} },
+  { teaser: "T1DM + 3-day diarrheal illness, missed insulin", dx: "DKA + diarrhea (combined acidosis)", stem: "19-year-old woman with type 1 diabetes, three days of diarrheal illness on top of several missed insulin doses.", story: "Two acidoses stacked on each other: high-anion-gap ketoacidosis from missed insulin, plus a normal-anion-gap component from diarrheal bicarbonate loss. The delta ratio (0.4–0.8) is what reveals the second process — the gap alone doesn't fully explain how low the HCO3 has fallen.",
+    input:{source:"arterial",pH:null,pCO2:19,HCO3gas:7,Na:135,Cl:108,K:4.5,Ca:9.0,Albumin:3.0,HCO3cmp:7} },
+  { teaser: "T1DM with vomiting x2 days", dx: "DKA + vomiting (acidosis + concurrent alkalosis)", stem: "24-year-old woman with DKA who has also been vomiting for two days.", story: "High-anion-gap ketoacidosis with a concurrent metabolic alkalosis from vomiting partially restoring the HCO3. The raw HCO3 looks less severe than the gap alone predicts — the delta ratio (>2) is the only way to see the hidden alkalosis underneath.",
+    input:{source:"arterial",pH:null,pCO2:35,HCO3gas:18,Na:138,Cl:90,K:3.2,Ca:9.4,Albumin:3.5,HCO3cmp:18} },
+  { teaser: "Large aspirin ingestion, tinnitus", dx: "Salicylate toxicity", stem: "17-year-old girl with an intentional large aspirin ingestion, tinnitus, and rapid, deep breathing.", story: "The classic mixed picture: a high-anion-gap metabolic acidosis (salicylates, lactate, ketones) plus a primary respiratory alkalosis from direct stimulation of the medullary respiratory center. The hyperventilation is more than the acidosis alone would drive — that gap between measured and expected PaCO2 is the tell.",
+    input:{source:"arterial",pH:null,pCO2:20,HCO3gas:14,Na:140,Cl:100,K:3.8,Ca:9.5,Albumin:4.0,HCO3cmp:14} },
+  { teaser: "T1DM + vomiting, venous line only", dx: "DKA, read from a venous gas", stem: "30-year-old man with type 1 diabetes and vomiting; only a venous line is available in a busy emergency department.", story: "High-anion-gap metabolic acidosis, read from a venous sample converted to an arterial-equivalent. Reasonable for screening and trending, but confirm with an ABG if the respiratory status itself is in question — venous PaCO2 correlates with arterial less reliably than pH or HCO3 do.",
+    input:{source:"venous",pH:7.25,pCO2:39,HCO3gas:17.5,Na:136,Cl:100,K:5.0,Ca:9.0,Albumin:4.0,HCO3cmp:20} },
+  { teaser: "Septic shock, malnourished, low albumin", dx: "Lactic acidosis unmasked by albumin correction", stem: "71-year-old man in septic shock, chronically malnourished with a low serum albumin.", story: "The raw anion gap reads as textbook-normal — but his albumin is low, and a low albumin lowers the expected baseline gap. Correcting for it unmasks a real, active lactic acidosis. Take-home point #8: always correct the gap in critically ill, hypoalbuminemic patients.",
+    input:{source:"arterial",pH:null,pCO2:32,HCO3gas:16,Na:138,Cl:110,K:4.0,Ca:8.0,Albumin:2.0,HCO3cmp:16} },
+  { teaser: "Diabetic nephropathy, new ACE inhibitor", dx: "RTA type IV (hypoaldosteronism)", stem: "58-year-old man with diabetic nephropathy, recently started on an ACE inhibitor, found to have a mild metabolic acidosis with hyperkalemia.", story: "Normal-anion-gap metabolic acidosis with hyperkalemia — the opposite potassium pattern from GI loss or classic RTA. This combination points to hypoaldosteronism / RTA type IV, a common finding in diabetic nephropathy and with ACE inhibitor use.",
+    input:{source:"arterial",pH:null,pCO2:33,HCO3gas:16,Na:138,Cl:112,K:5.8,Ca:9.5,Albumin:4.0,HCO3cmp:16} },
+  { teaser: "Post-ROSC after 20 minutes of CPR", dx: "Combined metabolic + respiratory acidosis (arrest physiology)", stem: "63-year-old man who just achieved return of spontaneous circulation after 20 minutes of CPR.", story: "Combined metabolic (lactic) and respiratory acidosis, both primary and pulling the same direction at once — tissue hypoperfusion during the arrest and inadequate ventilation are additive here, not compensating for one another. Nothing about this pattern is 'compensation.'",
+    input:{source:"arterial",pH:7.05,pCO2:55,HCO3gas:15,Na:140,Cl:115,K:5.5,Ca:9.0,Albumin:4.0,HCO3cmp:15} },
+  { teaser: "Cirrhosis + ascites on diuretics, encephalopathic", dx: "Combined metabolic + respiratory alkalosis", stem: "50-year-old woman with cirrhosis and ascites on diuretics, now encephalopathic and hyperventilating.", story: "Combined metabolic alkalosis (diuretic-driven) and respiratory alkalosis (hepatic-encephalopathy-driven hyperventilation), both primary and both pulling toward alkalemia at the same time — again, not compensation, two processes stacked in the same direction.",
+    input:{source:"arterial",pH:7.58,pCO2:30,HCO3gas:32,Na:140,Cl:94,K:3.0,Ca:9.5,Albumin:4.0,HCO3cmp:32} },
+];
+CASES.forEach(c => { if (c.input.pH === null) c.input.pH = Math.round(hhPH(c.input.pCO2, c.input.HCO3gas) * 100) / 100; });
+
+/* ============================== UI STATE / WIRING ============================== */
+let idx = 0;
+let revealed = { state: false, process: false, story: false };
+let stateGuess = null;
+
+const sel = document.getElementById("case-select");
+CASES.forEach((c, i) => { const o = document.createElement("option"); o.value = i; o.textContent = "Case " + (i+1) + " — " + c.teaser; sel.appendChild(o); });
+
+function kv(label, value, unit) {
+  return '<div class="kv"><span>' + label + '</span><b>' + value + (unit ? ' <span style="color:var(--muted); font-weight:400;">'+unit+'</span>' : '') + '</b></div>';
+}
+
+function renderCaseData() {
+  const c = CASES[idx];
+  const inp = c.input;
+  document.getElementById("source-tag").textContent = inp.source === "venous" ? "Venous sample" : "Arterial sample";
+  document.getElementById("gas-kv").innerHTML =
+    kv("pH", inp.pH) + kv("PaCO&#8322;", inp.pCO2, "mmHg") + kv("HCO&#8323;&#8315;", inp.HCO3gas, "mmol/L");
+  document.getElementById("cmp-kv").innerHTML =
+    kv("Na&#8314;", inp.Na) + kv("Cl&#8315;", inp.Cl) + kv("K&#8314;", inp.K) + kv("Ca", inp.Ca) + kv("Albumin", inp.Albumin) + kv("HCO&#8323;&#8315;", inp.HCO3cmp);
+  document.getElementById("case-counter").textContent = "Case " + (idx+1) + " of " + CASES.length;
+  sel.value = idx;
+}
+
+function resetWalkthrough() {
+  revealed = { state: false, process: false, story: false };
+  stateGuess = null;
+  document.getElementById("state-reveal").hidden = true;
+  document.getElementById("state-quiz").innerHTML = "";
+  document.getElementById("process-locked").hidden = false;
+  document.getElementById("process-quiz").hidden = true;
+  document.getElementById("guess-ag").value = "";
+  document.getElementById("guess-sid").value = "";
+  document.getElementById("guess-ag").disabled = false;
+  document.getElementById("guess-sid").disabled = false;
+  document.getElementById("check-work-btn").disabled = false;
+  document.getElementById("check-work-btn").hidden = false;
+  document.getElementById("calc-feedback").innerHTML = "";
+  document.getElementById("process-body").hidden = true;
+  document.getElementById("process-body").innerHTML = "";
+  document.getElementById("story-locked").hidden = false;
+  document.getElementById("story-body").hidden = true;
+  document.getElementById("story-body").innerHTML = "";
+  updateStepper();
+  buildStateQuiz();
+}
+
+function updateStepper() {
+  const map = { state: "stepper-state", process: "stepper-process", story: "stepper-story" };
+  Object.keys(map).forEach(k => document.getElementById(map[k]).classList.toggle("done", revealed[k]));
+  document.getElementById("stepper-state").classList.toggle("current", !revealed.state);
+  document.getElementById("stepper-process").classList.toggle("current", revealed.state && !revealed.process);
+  document.getElementById("stepper-story").classList.toggle("current", revealed.process && !revealed.story);
+}
+
+function buildStateQuiz() {
+  const wrap = document.getElementById("state-quiz");
+  wrap.innerHTML =
+    '<div class="quiz-row">' +
+      '<button class="quiz-btn" data-g="Acidemic">Acidemic</button>' +
+      '<button class="quiz-btn" data-g="Alkalotic">Alkalotic</button>' +
+      '<button class="quiz-btn" data-g="Normal">Normal</button>' +
+    '</div><div class="quiz-feedback" id="state-feedback"></div>';
+  wrap.querySelectorAll(".quiz-btn").forEach(btn => btn.addEventListener("click", () => onStateGuess(btn.dataset.g)));
+}
+
+function onStateGuess(guess) {
+  const c = CASES[idx];
+  const r = analyze(c.input);
+  stateGuess = guess;
+  document.querySelectorAll("#state-quiz .quiz-btn").forEach(btn => {
+    btn.disabled = true;
+    if (btn.dataset.g === r.state) btn.classList.add("correct");
+    else if (btn.dataset.g === guess) btn.classList.add("wrong");
+  });
+  const fb = document.getElementById("state-feedback");
+  if (guess === r.state) { fb.textContent = "Correct — pH " + r.pH.toFixed(2) + "."; fb.className = "quiz-feedback right"; }
+  else { fb.textContent = "Not quite — pH " + r.pH.toFixed(2) + " is " + r.state.toLowerCase() + "."; fb.className = "quiz-feedback miss"; }
+  showStateReveal(r);
+}
+
+function showStateReveal(r) {
+  const el = document.getElementById("state-reveal");
+  el.hidden = false;
+  el.innerHTML =
+    '<div style="margin-top:10px;">' +
+    '<span class="state-pill ' + (r.state === "Acidemic" ? "acidemic" : r.state === "Alkalotic" ? "alkalotic" : "normalstate") + '">' + r.state + '</span>' +
+    ' <span class="mono" style="color:var(--muted); margin-left:8px;">pH ' + r.pH.toFixed(2) + '</span>' +
+    '</div>' +
+    (r.normalPHWithAbnormalGas ? '<div class="quiz-feedback miss" style="margin-top:10px;">Watch this one: the pH is normal, but PaCO&#8322;/HCO3 are not &mdash; that does not rule out a real process. Keep going into Process.</div>' : '') +
+    (r.conversion ? '<div style="font-size:0.82rem; color:var(--muted); margin-top:10px;">Venous &rarr; arterial-equivalent: pH ' + r.conversion.raw.pH + ' &rarr; <b>' + r.conversion.converted.pH + '</b>, PaCO&#8322; ' + r.conversion.raw.pCO2 + ' &rarr; <b>' + r.conversion.converted.pCO2 + '</b>, HCO3 ' + r.conversion.raw.HCO3 + ' &rarr; <b>' + r.conversion.converted.HCO3 + '</b></div>' : '') +
+    '<button class="btn primary" id="advance-process-btn" style="margin-top:14px;">Continue to Process &rarr;</button>';
+  document.getElementById("advance-process-btn").addEventListener("click", () => {
+    revealed.state = true;
+    document.getElementById("process-locked").hidden = true;
+    document.getElementById("process-quiz").hidden = false;
+    document.getElementById("guess-ag").focus();
+    updateStepper();
+  });
+}
+
+function checkWork() {
+  const c = CASES[idx];
+  const r = analyze(c.input);
+  const agInput = document.getElementById("guess-ag");
+  const sidInput = document.getElementById("guess-sid");
+  const agGuess = parseFloat(agInput.value);
+  const sidGuess = parseFloat(sidInput.value);
+
+  function feedbackFor(guess, actual, label, formula) {
+    if (isNaN(guess)) return { cls: "miss", text: label + " left blank — it's " + actual + " (" + formula + ")." };
+    const diff = Math.round(Math.abs(guess - actual) * 10) / 10;
+    if (diff <= 0.5) return { cls: "right", text: label + ": correct — " + actual + "." };
+    if (diff <= 3) return { cls: "close", text: label + ": close. You said " + guess + ", it's " + actual + " (" + formula + ")." };
+    return { cls: "miss", text: label + ": off. You said " + guess + ", it's " + actual + " (" + formula + ")." };
+  }
+
+  const agFb = feedbackFor(agGuess, r.AG, "Anion gap", "Na − Cl − HCO3");
+  const sidFb = feedbackFor(sidGuess, r.sid, "SID", "Na − Cl");
+
+  document.getElementById("calc-feedback").innerHTML =
+    '<div class="quiz-feedback ' + agFb.cls + '">' + agFb.text + '</div>' +
+    '<div class="quiz-feedback ' + sidFb.cls + '">' + sidFb.text + '</div>';
+
+  agInput.disabled = true;
+  sidInput.disabled = true;
+  document.getElementById("check-work-btn").hidden = true;
+
+  showProcess();
+}
+document.getElementById("check-work-btn").addEventListener("click", checkWork);
+
+function showProcess() {
+  const c = CASES[idx];
+  const r = analyze(c.input);
+  const body = document.getElementById("process-body");
+  body.hidden = false;
+
+  let html = '<div class="metric-row">' +
+    '<div class="metric"><div class="m-label">Anion gap</div><div class="m-value">' + r.AG + '</div></div>' +
+    '<div class="metric ' + (r.hasHighAG ? "flag-high" : "flag-ok") + '"><div class="m-label">Corrected AG</div><div class="m-value">' + r.correctedAG + '</div></div>' +
+    '<div class="metric ' + (r.sidClass === "low" ? "flag-high" : r.sidClass === "high" ? "flag-low" : "flag-ok") + '"><div class="m-label">SID (Na&minus;Cl)</div><div class="m-value">' + r.sid + '</div></div>' +
+    '<div class="metric"><div class="m-label">Corrected Ca</div><div class="m-value">' + r.correctedCa + '</div></div>' +
+  '</div>';
+
+  if (r.hasHighAG && r.AG <= 16 && c.input.Albumin < 3.5) {
+    html += '<div class="quiz-feedback miss" style="margin-bottom:8px;">Raw AG (' + r.AG + ') looks normal, but albumin ' + c.input.Albumin + ' g/dL lowers the expected baseline &mdash; the corrected AG (' + r.correctedAG + ') unmasks the real gap.</div>';
+  }
+
+  if (r.noDisorder) {
+    html += '<div class="nodisorder">No acid–base disorder identified &mdash; PaCO&#8322;, HCO3, and the anion gap are all within expected bounds.</div>';
+  }
+  html += renderSteps(r);
+  html += '<button class="btn primary" id="advance-story-btn" style="margin-top:14px;">Continue to Story &rarr;</button>';
+  body.innerHTML = html;
+  revealed.process = true;
+  document.getElementById("advance-story-btn").addEventListener("click", () => {
+    document.getElementById("story-locked").hidden = true;
+    showStory();
+    updateStepper();
+  });
+}
+
+function showStory() {
+  const c = CASES[idx];
+  const r = analyze(c.input);
+  const body = document.getElementById("story-body");
+  body.hidden = false;
+
+  let diffHTML = "";
+  if (!r.noDisorder) {
+    r.processes.forEach(p => {
+      const diffs = differentialFor(p);
+      if (diffs.length) diffHTML += '<div style="margin-top:10px;"><b style="font-size:0.85rem;">' + processTitle(p) + '</b><div class="chip-row">' + diffs.map(d => '<span class="chip">'+d+'</span>').join("") + '</div></div>';
+    });
+  }
+
+  body.innerHTML =
+    '<div class="stem-box"><b>' + c.dx + '.</b> ' + c.stem + '</div>' +
+    '<div style="font-size:0.92rem; color: var(--ink-soft);">' + c.story + '</div>' +
+    diffHTML;
+  revealed.story = true;
+  updateStepper();
+}
+
+function loadCase(i) {
+  idx = ((i % CASES.length) + CASES.length) % CASES.length;
+  renderCaseData();
+  resetWalkthrough();
+}
+
+sel.addEventListener("change", () => loadCase(parseInt(sel.value, 10)));
+document.getElementById("prev-case").addEventListener("click", () => loadCase(idx - 1));
+document.getElementById("next-case").addEventListener("click", () => loadCase(idx + 1));
+
+loadCase(0);
+</script>
