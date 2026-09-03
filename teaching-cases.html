@@ -14,26 +14,7 @@
     --normalstate: #3d7f52; --normalstate-soft: #dcefe1;
     --warn: #96601b; --warn-soft: #f6ead3;
     --focus: #0e7a70;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --ink: #e7edec; --ink-soft: #c4cfce; --paper: #10181a; --surface: #172124; --surface-2: #1e2b2e;
-      --line: #2c3a3d; --line-strong: #3c4d50; --muted: #93a4a3;
-      --accent: #4fc3b6; --accent-ink: #08211d; --accent-soft: #163330;
-      --acidemic: #e08a72; --acidemic-soft: #3a2420;
-      --alkalotic: #a3b1e6; --alkalotic-soft: #232a47;
-      --normalstate: #8fd1a3; --normalstate-soft: #1c3423;
-      --warn: #e3b567; --warn-soft: #3a2e15;
-    }
-  }
-  :root[data-theme="dark"] {
-    --ink: #e7edec; --ink-soft: #c4cfce; --paper: #10181a; --surface: #172124; --surface-2: #1e2b2e;
-    --line: #2c3a3d; --line-strong: #3c4d50; --muted: #93a4a3;
-    --accent: #4fc3b6; --accent-ink: #08211d; --accent-soft: #163330;
-    --acidemic: #e08a72; --acidemic-soft: #3a2420;
-    --alkalotic: #a3b1e6; --alkalotic-soft: #232a47;
-    --normalstate: #8fd1a3; --normalstate-soft: #1c3423;
-    --warn: #e3b567; --warn-soft: #3a2e15;
+    color-scheme: light;
   }
 
   * { box-sizing: border-box; }
@@ -177,11 +158,23 @@
 
   footer.site { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.8rem; }
   footer.site a { color: var(--muted); }
+
+  /* easter eggs */
+  .egg-toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(16px);
+    background: var(--ink); color: var(--paper); padding: 12px 20px; border-radius: 999px;
+    font-family: "IBM Plex Sans", sans-serif; font-size: 0.85rem; font-weight: 600; text-align: center;
+    box-shadow: 0 10px 30px rgba(20,20,20,0.28); z-index: 9999; opacity: 0; pointer-events: none;
+    transition: opacity 0.35s ease, transform 0.35s ease; max-width: min(90vw, 480px);
+  }
+  .egg-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  @keyframes egg-rainbow { 0% { filter: hue-rotate(0deg) saturate(1.4); } 100% { filter: hue-rotate(360deg) saturate(1.4); } }
+  body.egg-rainbow { animation: egg-rainbow 1.4s linear infinite; }
 </style>
 
 <header class="top">
   <div class="top-inner">
-    <h1>Sixteen Cases</h1>
+    <h1>State &rarr; Process &rarr; Story</h1>
     <div class="segmented" role="group" aria-label="Page">
       <a href="index.html">Analyzer</a>
       <span class="active">Learning Cases</span>
@@ -723,11 +716,87 @@ function loadCase(i) {
   idx = ((i % CASES.length) + CASES.length) % CASES.length;
   renderCaseData();
   resetWalkthrough();
+  trackVisitedCase(idx);
 }
 
 sel.addEventListener("change", () => loadCase(parseInt(sel.value, 10)));
 document.getElementById("prev-case").addEventListener("click", () => loadCase(idx - 1));
 document.getElementById("next-case").addEventListener("click", () => loadCase(idx + 1));
+
+/* ============================== EASTER EGGS ============================== */
+
+function showEggToast(msg, ms) {
+  ms = ms || 3200;
+  let t = document.getElementById("egg-toast");
+  if (!t) {
+    t = document.createElement("div");
+    t.id = "egg-toast";
+    t.className = "egg-toast";
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._eggTimer);
+  t._eggTimer = setTimeout(() => t.classList.remove("show"), ms);
+}
+
+// Konami code: ↑ ↑ ↓ ↓ ← → ← → B A
+const KONAMI_SEQ = ["ArrowUp","ArrowUp","ArrowDown","ArrowDown","ArrowLeft","ArrowRight","ArrowLeft","ArrowRight","b","a"];
+let konamiIdx = 0;
+document.addEventListener("keydown", (e) => {
+  const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  const expected = KONAMI_SEQ[konamiIdx];
+  if (key === expected) {
+    konamiIdx++;
+    if (konamiIdx === KONAMI_SEQ.length) {
+      konamiIdx = 0;
+      document.body.classList.add("egg-rainbow");
+      showEggToast("Konami unlocked — you've mastered button-mashing AND acid–base. 🎮🩸", 4200);
+      setTimeout(() => document.body.classList.remove("egg-rainbow"), 4200);
+    }
+  } else {
+    konamiIdx = (key === KONAMI_SEQ[0]) ? 1 : 0;
+  }
+});
+
+// Click the title 5x fast for a random clinical quip
+const TITLE_QUIPS = [
+  "Kussmaul breathing: the body's way of saying \"I'll fix this myself.\"",
+  "Remember: –emia is a state, –osis is a process. Also, you found this.",
+  "Somewhere, a resident is being pimped on Winter's formula right now.",
+  "SID: because chloride deserves attention too.",
+  "Labs first, diagnosis last — also true of this 5x click streak.",
+];
+(function () {
+  const h1 = document.querySelector("header.top h1");
+  if (!h1) return;
+  let clicks = [];
+  h1.addEventListener("click", () => {
+    const now = Date.now();
+    clicks = clicks.filter(t => now - t < 2000);
+    clicks.push(now);
+    if (clicks.length >= 5) {
+      clicks = [];
+      showEggToast(TITLE_QUIPS[Math.floor(Math.random() * TITLE_QUIPS.length)], 3800);
+    }
+  });
+})();
+
+// Completionist badge: work through all 16 cases in one sitting
+const visitedCases = new Set();
+let allCasesToastShown = false;
+function trackVisitedCase(i) {
+  visitedCases.add(i);
+  if (!allCasesToastShown && visitedCases.size === CASES.length) {
+    allCasesToastShown = true;
+    showEggToast("All 16 down. Book smart, bedside ready. 🏅", 4200);
+  }
+}
+
+// A console note for anyone poking around in devtools
+console.log("%cSTATE → PROCESS → STORY", "font:700 20px 'IBM Plex Sans',sans-serif; color:#0e7a70;");
+console.log("%cInterpret PaCO₂ in context of HCO3, then AG, then SID — Dr. Sara Crager, Critical Care Time #84.", "font:13px 'IBM Plex Mono',monospace; color:#5c6d6e;");
+console.log("%cTry the Konami code (↑↑↓↓←→←→BA) somewhere on this page.", "font:12px 'IBM Plex Mono',monospace; color:#96601b;");
 
 loadCase(0);
 </script>
