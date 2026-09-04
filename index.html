@@ -25,6 +25,8 @@
     --normalstate-soft: #dcefe1;
     --warn: #96601b;
     --warn-soft: #f6ead3;
+    --danger: #a8202a;
+    --danger-soft: #f8dcdd;
     --focus: #0e7a70;
     --shadow-color: 210 20% 10%;
     color-scheme: light;
@@ -132,6 +134,7 @@
   }
   .callout.warn { background: var(--warn-soft); border-color: var(--warn); color: var(--ink-soft); }
   .callout.info { background: var(--accent-soft); border-color: var(--accent); color: var(--ink-soft); }
+  .callout.error { background: var(--danger-soft); border-color: var(--danger); border-width: 2px; color: var(--danger); font-weight: 600; }
 
   /* metrics row */
   .metric-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 4px; }
@@ -166,6 +169,7 @@
   .fit-no { color: var(--acidemic); font-weight: 600; }
 
   .nodisorder { color: var(--normalstate); font-weight: 600; padding: 8px 0; }
+  .blocked { color: var(--danger); font-weight: 600; padding: 8px 0; }
 
   /* stepwise interpretation */
   .step-card {
@@ -299,7 +303,8 @@
           <span class="state-pill" id="state-pill">&mdash;</span>
           <span class="state-ph">pH <b id="state-ph-val">&mdash;</b></span>
         </div>
-        <div class="emia-note"><b>&#8211;emia</b> describes the patient's current blood pH. <b>&#8211;osis</b> describes a process acting on it &mdash; a patient can be acidemic, alkalemic, <em>or normal</em>, while one or more &#8211;osis processes are still underway.</div>
+        <div class="emia-note"><b>&#8211;emia</b> describes the patient's current blood pH. <b>&#8211;osis</b> describes a process acting on it &mdash; a patient's state can be acidemia, alkalemia, <em>or normal</em>, while one or more &#8211;osis processes are still underway.</div>
+        <div id="inconsistency-callout" class="callout error" hidden></div>
         <div id="normal-ph-callout" class="callout warn" hidden>Normal pH does not exclude major acid&#8211;base abnormality &mdash; see Process below.</div>
         <div id="discrepancy-callout" class="callout warn" hidden></div>
       </section>
@@ -314,10 +319,10 @@
             <div class="m-value" id="ag-value">&mdash;</div>
             <div class="m-detail" id="ag-detail">&mdash;</div>
           </div>
-          <div class="metric" id="metric-cag">
-            <div class="m-label">Albumin-corrected AG</div>
-            <div class="m-value" id="cag-value">&mdash;</div>
-            <div class="m-detail" id="cag-detail">&mdash;</div>
+          <div class="metric" id="metric-expag">
+            <div class="m-label">Expected normal AG</div>
+            <div class="m-value" id="expag-value">&mdash;</div>
+            <div class="m-detail" id="expag-detail">&mdash;</div>
           </div>
           <div class="metric" id="metric-sid">
             <div class="m-label">Strong ion difference (Na&minus;Cl)</div>
@@ -376,11 +381,10 @@ function convertVenousToArterial(pH, pCO2, HCO3) {
 }
 function correctedCalcium(ca, albumin) { return round(ca + 0.8*(4.0-albumin), 2); }
 function anionGap(Na, Cl, HCO3) { return round(Na - Cl - HCO3, 1); }
-function correctedAG(AG, albumin) { return round(AG + 2.5*(4.0-albumin), 1); }
 function expectedNormalAG(albumin) { return round(3*albumin, 1); }
 function SID(Na, Cl) { return round(Na - Cl, 1); }
 function classifySID(sid) { if (sid < 38) return "low"; if (sid > 40) return "high"; return "normal"; }
-function stateOf(pH) { if (pH < 7.35) return "Acidemic"; if (pH > 7.45) return "Alkalotic"; return "Normal"; }
+function stateOf(pH) { if (pH < 7.35) return "Acidemia"; if (pH > 7.45) return "Alkalemia"; return "Normal"; }
 
 function winterExpected(HCO3) { const mid = 1.5*HCO3+8; return { lo: round(mid-2,1), hi: round(mid+2,1), mid: round(mid,1) }; }
 function metAlkalosisExpected(HCO3) { const mid = 0.7*HCO3+20; return { lo: round(mid-1.5,1), hi: round(mid+1.5,1), mid: round(mid,1) }; }
@@ -390,6 +394,14 @@ function acuteRespAlkalosisExpectedHCO3(pCO2) { const d=40-pCO2; const mid=24-0.
 function chronicRespAlkalosisExpectedHCO3(pCO2) { const d=40-pCO2; const mid=24-0.45*d; return { lo: round(mid-3,1), hi: round(mid+3,1), mid: round(mid,1) }; }
 function inRange(v, r) { return v >= r.lo && v <= r.hi; }
 function pHPearlExpectedPCO2(pH) { return Math.round((pH % 1) * 100); }
+
+// Reality check: Henderson-Hasselbalch is a law, not a rule of thumb — a real,
+// simultaneously-drawn ABG must satisfy pH = 6.1 + log10(HCO3 / (0.03 x PaCO2))
+// to within rounding. A big mismatch means the entered numbers can't all be
+// from the same real patient (e.g. an "alkalemic" pH paired with acidosis-only
+// gas values). Used below to flag internally contradictory inputs as an error.
+function hhPH(pCO2, HCO3) { return 6.1 + Math.log10(HCO3 / (0.03 * pCO2)); }
+const INCONSISTENCY_TOLERANCE = 0.15;
 
 function analyze(input) {
   const source = input.source, pHin = input.pH, pCO2in = input.pCO2, HCO3gasIn = input.HCO3gas;
@@ -407,9 +419,8 @@ function analyze(input) {
 
   const st = stateOf(pH);
   const AG = anionGap(Na, Cl, HCO3forAG);
-  const cAG = correctedAG(AG, Albumin);
   const expNormalAG = expectedNormalAG(Albumin);
-  const hasHighAG = cAG > expNormalAG + 2;
+  const hasHighAG = AG > expNormalAG + 2;
   const sid = SID(Na, Cl);
   const sidClass = classifySID(sid);
   const correctedCa = correctedCalcium(Ca, Albumin);
@@ -420,7 +431,7 @@ function analyze(input) {
   const processes = [];
 
   if (hasHighAG) {
-    const deltaAG = cAG - expNormalAG;
+    const deltaAG = AG - expNormalAG;
     const deltaHCO3 = 24 - HCO3gas;
     let deltaRatio = null, deltaRatioCategory;
     if (deltaHCO3 !== 0) {
@@ -501,8 +512,29 @@ function analyze(input) {
   }
 
   const noDisorder = processes.length === 0;
-  return { pH, pCO2, HCO3gas, conversion, gasCmpDiscrepancy, state: st, AG, correctedAG: cAG, expNormalAG, hasHighAG,
-    sid, sidClass, correctedCa, processes, noDisorder, normalPHWithAbnormalGas: st === "Normal" && !noDisorder };
+
+  const predictedPH = round(hhPH(pCO2, HCO3gas), 3);
+  const phDiscrepancy = round(pH - predictedPH, 3);
+  const inconsistent = Math.abs(phDiscrepancy) > INCONSISTENCY_TOLERANCE;
+  let inconsistencyMessage = null;
+  if (inconsistent) {
+    const hasAcidosisProcess = processes.some(p => p.label.includes("acidosis"));
+    const hasAlkalosisProcess = processes.some(p => p.label.includes("alkalosis"));
+    let directionNote = "";
+    if (st === "Acidemia" && hasAlkalosisProcess && !hasAcidosisProcess) {
+      directionNote = " An acidemic pH can't be produced by alkalosis-only processes.";
+    } else if (st === "Alkalemia" && hasAcidosisProcess && !hasAlkalosisProcess) {
+      directionNote = " An alkalemic pH can't be produced by acidosis-only processes.";
+    }
+    inconsistencyMessage = "Not a realistic case: PaCO2 " + pCO2 + " and HCO3 " + HCO3gas + " predict a pH near " +
+      predictedPH.toFixed(2) + ", but you entered pH " + pH.toFixed(2) + " — a difference of " +
+      Math.abs(phDiscrepancy).toFixed(2) + ", too large for one real blood gas." + directionNote +
+      " Double-check the pH, PaCO2, and HCO3 you entered.";
+  }
+
+  return { pH, pCO2, HCO3gas, conversion, gasCmpDiscrepancy, state: st, AG, expNormalAG, hasHighAG,
+    sid, sidClass, correctedCa, processes, noDisorder, normalPHWithAbnormalGas: st === "Normal" && !noDisorder,
+    predictedPH, phDiscrepancy, inconsistent, inconsistencyMessage };
 }
 
 /* ============================== STORY ENGINE ============================== */
@@ -633,7 +665,7 @@ function renderSteps(result) {
 
   const step2 = stepWrap(2, "Anion gap",
     "AG = Na &minus; Cl &minus; HCO3. &ldquo;Where there&rsquo;s a gap, there&rsquo;s an acidosis.&rdquo;",
-    '<div>AG ' + result.AG + ', corrected for albumin ' + result.correctedAG + ' (expected normal &asymp; ' + result.expNormalAG + ', 3&times;albumin).</div>' +
+    '<div>AG ' + result.AG + ' &mdash; expected normal &asymp; ' + result.expNormalAG + ' (the 3&times;albumin cheat).</div>' +
     stepVerdict(result.hasHighAG ? "flag" : "ok", result.hasHighAG ?
       "Elevated &mdash; a high-anion-gap metabolic acidosis is present, regardless of the pH." : "Not elevated &mdash; no anion-gap acidosis.") +
     step2Cards.join(""));
@@ -688,11 +720,17 @@ function renderProcessCard(p) {
 
 function render(result, input) {
   const statePill = document.getElementById("state-pill");
-  statePill.textContent = result.state === "Acidemic" ? "Acidemic" : result.state === "Alkalotic" ? "Alkalotic" : "Normal";
-  statePill.className = "state-pill " + (result.state === "Acidemic" ? "acidemic" : result.state === "Alkalotic" ? "alkalotic" : "normalstate");
+  statePill.textContent = result.state;
+  statePill.className = "state-pill " + (result.state === "Acidemia" ? "acidemic" : result.state === "Alkalemia" ? "alkalotic" : "normalstate");
   document.getElementById("state-ph-val").textContent = result.pH.toFixed(2);
 
-  document.getElementById("normal-ph-callout").hidden = !result.normalPHWithAbnormalGas;
+  const incEl = document.getElementById("inconsistency-callout");
+  if (result.inconsistent) {
+    incEl.hidden = false;
+    incEl.textContent = result.inconsistencyMessage;
+  } else incEl.hidden = true;
+
+  document.getElementById("normal-ph-callout").hidden = !result.normalPHWithAbnormalGas || result.inconsistent;
   const discEl = document.getElementById("discrepancy-callout");
   if (result.gasCmpDiscrepancy) {
     discEl.hidden = false;
@@ -708,10 +746,10 @@ function render(result, input) {
 
   document.getElementById("ag-value").textContent = result.AG;
   document.getElementById("ag-detail").textContent = "Na − Cl − HCO3";
-  const cagFlag = result.hasHighAG ? "flag-high" : "flag-ok";
-  document.getElementById("metric-cag").className = "metric " + cagFlag;
-  document.getElementById("cag-value").textContent = result.correctedAG;
-  document.getElementById("cag-detail").textContent = "expected normal ≈ " + result.expNormalAG + " (3×albumin) — " + (result.hasHighAG ? "elevated" : "not elevated");
+  const agFlag = result.hasHighAG ? "flag-high" : "flag-ok";
+  document.getElementById("metric-ag").className = "metric " + agFlag;
+  document.getElementById("expag-value").textContent = result.expNormalAG;
+  document.getElementById("expag-detail").textContent = "3×albumin cheat — AG is " + (result.hasHighAG ? "elevated" : "not elevated") + " against it";
 
   const sidFlag = result.sidClass === "low" ? "flag-high" : result.sidClass === "high" ? "flag-low" : "flag-ok";
   document.getElementById("metric-sid").className = "metric " + sidFlag;
@@ -724,7 +762,7 @@ function render(result, input) {
   const maskEl = document.getElementById("ag-mask-callout");
   if (result.hasHighAG && result.AG <= 16 && input.Albumin < 3.5) {
     maskEl.hidden = false;
-    maskEl.textContent = "Raw AG (" + result.AG + ") reads as textbook-normal, but hypoalbuminemia (albumin " + input.Albumin + " g/dL) lowers the expected baseline — corrected AG (" + result.correctedAG + ") unmasks an active gap acidosis.";
+    maskEl.textContent = "Raw AG (" + result.AG + ") reads as textbook-normal, but hypoalbuminemia (albumin " + input.Albumin + " g/dL) lowers this patient's expected-normal AG (3×albumin ≈ " + result.expNormalAG + ") — against that baseline, it's actually elevated.";
   } else maskEl.hidden = true;
 
   const listEl = document.getElementById("process-list");
@@ -732,7 +770,10 @@ function render(result, input) {
   const storyEl = document.getElementById("story-list");
   storyEl.innerHTML = "";
 
-  if (result.noDisorder) {
+  if (result.inconsistent) {
+    listEl.innerHTML = '<div class="blocked">Interpretation blocked — these values aren\'t physiologically consistent. See the error above and fix the inputs.</div>';
+    storyEl.innerHTML = '<div class="story-cue">No story to tell yet — Process is blocked until the entered pH, PaCO&#8322;, and HCO3 agree with each other.</div>';
+  } else if (result.noDisorder) {
     listEl.innerHTML = '<div class="nodisorder">No acid–base disorder identified — PaCO₂, HCO3, and the anion gap are all within expected bounds.</div>' + renderSteps(result);
     storyEl.innerHTML = '<div class="story-cue">Nothing to explain — gas and chemistry are consistent with normal acid–base physiology.</div>';
   } else {
@@ -775,10 +816,18 @@ document.getElementById("analyze-btn").addEventListener("click", runAnalysis);
 document.getElementById("copy-btn").addEventListener("click", () => {
   const input = readInputs();
   const result = analyze(input);
+  if (result.inconsistent) {
+    navigator.clipboard.writeText("Not copied: entered pH/PaCO2/HCO3 are not physiologically consistent — fix the inputs before charting this.");
+    const c = document.getElementById("copy-confirm");
+    c.textContent = "Blocked — inputs are inconsistent, nothing copied.";
+    c.hidden = false;
+    setTimeout(() => { c.hidden = true; c.textContent = "Copied."; }, 2600);
+    return;
+  }
   let lines = [];
   lines.push("STATE: " + result.state + " (pH " + result.pH.toFixed(2) + ")");
   lines.push("PROCESS: " + (result.noDisorder ? "no acid-base disorder identified" : result.processes.map(p => processTitle(p) + (p.duration ? " (" + p.duration + ")" : "")).join(" + ")));
-  lines.push("AG " + result.AG + " (corrected " + result.correctedAG + ", expected normal ≈ " + result.expNormalAG + ") | SID " + result.sid + " (" + result.sidClass + ") | corrected Ca " + result.correctedCa);
+  lines.push("AG " + result.AG + " (expected normal ≈ " + result.expNormalAG + ", 3×albumin) | SID " + result.sid + " (" + result.sidClass + ") | corrected Ca " + result.correctedCa);
   const synthesis = document.getElementById("synthesis").value.trim();
   lines.push("STORY: " + (synthesis || "(not yet entered)"));
   const text = lines.join("\n");
