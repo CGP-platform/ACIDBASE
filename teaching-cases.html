@@ -258,11 +258,10 @@ function round(x, d) { d = d===undefined?1:d; const f = Math.pow(10,d); return M
 function convertVenousToArterial(pH, pCO2, HCO3) { return { pH: round(pH+0.03,3), pCO2: round(pCO2-5,1), HCO3: round(HCO3-1.5,1) }; }
 function correctedCalcium(ca, albumin) { return round(ca + 0.8*(4.0-albumin), 2); }
 function anionGap(Na, Cl, HCO3) { return round(Na - Cl - HCO3, 1); }
-function correctedAG(AG, albumin) { return round(AG + 2.5*(4.0-albumin), 1); }
 function expectedNormalAG(albumin) { return round(3*albumin, 1); }
 function SID(Na, Cl) { return round(Na - Cl, 1); }
 function classifySID(sid) { if (sid < 38) return "low"; if (sid > 40) return "high"; return "normal"; }
-function stateOf(pH) { if (pH < 7.35) return "Acidemic"; if (pH > 7.45) return "Alkalotic"; return "Normal"; }
+function stateOf(pH) { if (pH < 7.35) return "Acidemia"; if (pH > 7.45) return "Alkalemia"; return "Normal"; }
 function winterExpected(HCO3) { const mid = 1.5*HCO3+8; return { lo: round(mid-2,1), hi: round(mid+2,1), mid: round(mid,1) }; }
 function metAlkalosisExpected(HCO3) { const mid = 0.7*HCO3+20; return { lo: round(mid-1.5,1), hi: round(mid+1.5,1), mid: round(mid,1) }; }
 function acuteRespAcidosisExpectedHCO3(pCO2) { const d=pCO2-40; const mid=24+0.1*d; return { lo: round(mid-2,1), hi: round(mid+2,1), mid: round(mid,1) }; }
@@ -271,6 +270,11 @@ function acuteRespAlkalosisExpectedHCO3(pCO2) { const d=40-pCO2; const mid=24-0.
 function chronicRespAlkalosisExpectedHCO3(pCO2) { const d=40-pCO2; const mid=24-0.45*d; return { lo: round(mid-3,1), hi: round(mid+3,1), mid: round(mid,1) }; }
 function inRange(v, r) { return v >= r.lo && v <= r.hi; }
 function pHPearlExpectedPCO2(pH) { return Math.round((pH % 1) * 100); }
+// Reality check: Henderson-Hasselbalch (see hhPH below) is a law, not a rule of
+// thumb — a real, simultaneously-drawn ABG must satisfy it almost exactly. Flags
+// case data that couldn't come from one real patient (e.g. acidemia paired with
+// alkalosis-only processes) as an authoring error rather than a valid case.
+const INCONSISTENCY_TOLERANCE = 0.15;
 
 function analyze(input) {
   const source = input.source, pHin = input.pH, pCO2in = input.pCO2, HCO3gasIn = input.HCO3gas;
@@ -285,9 +289,8 @@ function analyze(input) {
   const gasCmpDiscrepancy = (HCO3cmp !== null && HCO3cmp !== undefined) && Math.abs(HCO3cmp - HCO3gas) > 3;
   const st = stateOf(pH);
   const AG = anionGap(Na, Cl, HCO3forAG);
-  const cAG = correctedAG(AG, Albumin);
   const expNormalAG = expectedNormalAG(Albumin);
-  const hasHighAG = cAG > expNormalAG + 2;
+  const hasHighAG = AG > expNormalAG + 2;
   const sid = SID(Na, Cl);
   const sidClass = classifySID(sid);
   const correctedCa = correctedCalcium(Ca, Albumin);
@@ -296,7 +299,7 @@ function analyze(input) {
   const processes = [];
 
   if (hasHighAG) {
-    const deltaAG = cAG - expNormalAG;
+    const deltaAG = AG - expNormalAG;
     const deltaHCO3 = 24 - HCO3gas;
     let deltaRatio = null, deltaRatioCategory;
     if (deltaHCO3 !== 0) {
@@ -357,7 +360,21 @@ function analyze(input) {
     }
   }
   const noDisorder = processes.length === 0;
-  return { pH, pCO2, HCO3gas, conversion, gasCmpDiscrepancy, state: st, AG, correctedAG: cAG, expNormalAG, hasHighAG, sid, sidClass, correctedCa, processes, noDisorder, normalPHWithAbnormalGas: st === "Normal" && !noDisorder };
+
+  const predictedPH = round(hhPH(pCO2, HCO3gas), 3);
+  const phDiscrepancy = round(pH - predictedPH, 3);
+  const inconsistent = Math.abs(phDiscrepancy) > INCONSISTENCY_TOLERANCE;
+  let inconsistencyMessage = null;
+  if (inconsistent) {
+    const hasAcidosisProcess = processes.some(p => p.label.includes("acidosis"));
+    const hasAlkalosisProcess = processes.some(p => p.label.includes("alkalosis"));
+    let directionNote = "";
+    if (st === "Acidemia" && hasAlkalosisProcess && !hasAcidosisProcess) directionNote = " An acidemic pH can't be produced by alkalosis-only processes.";
+    else if (st === "Alkalemia" && hasAcidosisProcess && !hasAlkalosisProcess) directionNote = " An alkalemic pH can't be produced by acidosis-only processes.";
+    inconsistencyMessage = "Not a realistic case: PaCO2 " + pCO2 + " and HCO3 " + HCO3gas + " predict a pH near " + predictedPH.toFixed(2) + ", but pH is " + pH.toFixed(2) + " — a difference of " + Math.abs(phDiscrepancy).toFixed(2) + ", too large for one real blood gas." + directionNote;
+  }
+
+  return { pH, pCO2, HCO3gas, conversion, gasCmpDiscrepancy, state: st, AG, expNormalAG, hasHighAG, sid, sidClass, correctedCa, processes, noDisorder, normalPHWithAbnormalGas: st === "Normal" && !noDisorder, predictedPH, phDiscrepancy, inconsistent, inconsistencyMessage };
 }
 
 const DIFFERENTIALS = {
@@ -472,7 +489,7 @@ function renderSteps(result) {
 
   const step2 = stepWrap(2, "Anion gap",
     "AG = Na &minus; Cl &minus; HCO3. &ldquo;Where there&rsquo;s a gap, there&rsquo;s an acidosis.&rdquo;",
-    '<div>AG ' + result.AG + ', corrected for albumin ' + result.correctedAG + ' (expected normal &asymp; ' + result.expNormalAG + ', 3&times;albumin).</div>' +
+    '<div>AG ' + result.AG + ' &mdash; expected normal &asymp; ' + result.expNormalAG + ' (the 3&times;albumin cheat).</div>' +
     stepVerdict(result.hasHighAG ? "flag" : "ok", result.hasHighAG ?
       "Elevated &mdash; a high-anion-gap metabolic acidosis is present, regardless of the pH." : "Not elevated &mdash; no anion-gap acidosis.") +
     step2Cards.join(""));
@@ -521,11 +538,18 @@ const CASES = [
   { teaser: "Diabetic nephropathy, new ACE inhibitor", dx: "RTA type IV (hypoaldosteronism)", stem: "58-year-old man with diabetic nephropathy, recently started on an ACE inhibitor, found to have a mild metabolic acidosis with hyperkalemia.", story: "Normal-anion-gap metabolic acidosis with hyperkalemia — the opposite potassium pattern from GI loss or classic RTA. This combination points to hypoaldosteronism / RTA type IV, a common finding in diabetic nephropathy and with ACE inhibitor use.",
     input:{source:"arterial",pH:null,pCO2:33,HCO3gas:16,Na:138,Cl:112,K:5.8,Ca:9.5,Albumin:4.0,HCO3cmp:16} },
   { teaser: "Post-ROSC after 20 minutes of CPR", dx: "Combined metabolic + respiratory acidosis (arrest physiology)", stem: "63-year-old man who just achieved return of spontaneous circulation after 20 minutes of CPR.", story: "Combined metabolic (lactic) and respiratory acidosis, both primary and pulling the same direction at once — tissue hypoperfusion during the arrest and inadequate ventilation are additive here, not compensating for one another. Nothing about this pattern is 'compensation.'",
-    input:{source:"arterial",pH:7.05,pCO2:55,HCO3gas:15,Na:140,Cl:115,K:5.5,Ca:9.0,Albumin:4.0,HCO3cmp:15} },
+    input:{source:"arterial",pH:7.05,pCO2:55,HCO3gas:15,Na:140,Cl:100,K:5.5,Ca:9.0,Albumin:4.0,HCO3cmp:15} },
   { teaser: "Cirrhosis + ascites on diuretics, encephalopathic", dx: "Combined metabolic + respiratory alkalosis", stem: "50-year-old woman with cirrhosis and ascites on diuretics, now encephalopathic and hyperventilating.", story: "Combined metabolic alkalosis (diuretic-driven) and respiratory alkalosis (hepatic-encephalopathy-driven hyperventilation), both primary and both pulling toward alkalemia at the same time — again, not compensation, two processes stacked in the same direction.",
     input:{source:"arterial",pH:7.58,pCO2:30,HCO3gas:32,Na:140,Cl:94,K:3.0,Ca:9.5,Albumin:4.0,HCO3cmp:32} },
 ];
 CASES.forEach(c => { if (c.input.pH === null) c.input.pH = Math.round(hhPH(c.input.pCO2, c.input.HCO3gas) * 100) / 100; });
+// Integrity check, not a user-facing feature: every case's own numbers must be
+// internally consistent (see the reality check in analyze()). Flags an authoring
+// mistake in this array during development rather than teaching a fake case.
+CASES.forEach((c, i) => {
+  const r = analyze(c.input);
+  if (r.inconsistent) console.error("Case " + (i+1) + " (" + c.teaser + ") has inconsistent numbers: " + r.inconsistencyMessage);
+});
 
 /* ============================== UI STATE / WIRING ============================== */
 let idx = 0;
@@ -586,8 +610,8 @@ function buildStateQuiz() {
   const wrap = document.getElementById("state-quiz");
   wrap.innerHTML =
     '<div class="quiz-row">' +
-      '<button class="quiz-btn" data-g="Acidemic">Acidemic</button>' +
-      '<button class="quiz-btn" data-g="Alkalotic">Alkalotic</button>' +
+      '<button class="quiz-btn" data-g="Acidemia">Acidemia</button>' +
+      '<button class="quiz-btn" data-g="Alkalemia">Alkalemia</button>' +
       '<button class="quiz-btn" data-g="Normal">Normal</button>' +
     '</div><div class="quiz-feedback" id="state-feedback"></div>';
   wrap.querySelectorAll(".quiz-btn").forEach(btn => btn.addEventListener("click", () => onStateGuess(btn.dataset.g)));
@@ -613,7 +637,7 @@ function showStateReveal(r) {
   el.hidden = false;
   el.innerHTML =
     '<div style="margin-top:10px;">' +
-    '<span class="state-pill ' + (r.state === "Acidemic" ? "acidemic" : r.state === "Alkalotic" ? "alkalotic" : "normalstate") + '">' + r.state + '</span>' +
+    '<span class="state-pill ' + (r.state === "Acidemia" ? "acidemic" : r.state === "Alkalemia" ? "alkalotic" : "normalstate") + '">' + r.state + '</span>' +
     ' <span class="mono" style="color:var(--muted); margin-left:8px;">pH ' + r.pH.toFixed(2) + '</span>' +
     '</div>' +
     (r.normalPHWithAbnormalGas ? '<div class="quiz-feedback miss" style="margin-top:10px;">Watch this one: the pH is normal, but PaCO&#8322;/HCO3 are not &mdash; that does not rule out a real process. Keep going into Process.</div>' : '') +
@@ -666,14 +690,14 @@ function showProcess() {
   body.hidden = false;
 
   let html = '<div class="metric-row">' +
-    '<div class="metric"><div class="m-label">Anion gap</div><div class="m-value">' + r.AG + '</div></div>' +
-    '<div class="metric ' + (r.hasHighAG ? "flag-high" : "flag-ok") + '"><div class="m-label">Corrected AG</div><div class="m-value">' + r.correctedAG + '</div></div>' +
+    '<div class="metric ' + (r.hasHighAG ? "flag-high" : "flag-ok") + '"><div class="m-label">Anion gap</div><div class="m-value">' + r.AG + '</div></div>' +
+    '<div class="metric"><div class="m-label">Expected normal AG</div><div class="m-value">' + r.expNormalAG + '</div></div>' +
     '<div class="metric ' + (r.sidClass === "low" ? "flag-high" : r.sidClass === "high" ? "flag-low" : "flag-ok") + '"><div class="m-label">SID (Na&minus;Cl)</div><div class="m-value">' + r.sid + '</div></div>' +
     '<div class="metric"><div class="m-label">Corrected Ca</div><div class="m-value">' + r.correctedCa + '</div></div>' +
   '</div>';
 
   if (r.hasHighAG && r.AG <= 16 && c.input.Albumin < 3.5) {
-    html += '<div class="quiz-feedback miss" style="margin-bottom:8px;">Raw AG (' + r.AG + ') looks normal, but albumin ' + c.input.Albumin + ' g/dL lowers the expected baseline &mdash; the corrected AG (' + r.correctedAG + ') unmasks the real gap.</div>';
+    html += '<div class="quiz-feedback miss" style="margin-bottom:8px;">Raw AG (' + r.AG + ') looks normal, but albumin ' + c.input.Albumin + ' g/dL lowers this patient\'s expected-normal AG (3&times;albumin &asymp; ' + r.expNormalAG + ') &mdash; against that baseline, it\'s actually elevated.</div>';
   }
 
   if (r.noDisorder) {
