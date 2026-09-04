@@ -88,6 +88,7 @@
   .quiz-feedback.right { color: var(--normalstate); }
   .quiz-feedback.close { color: var(--warn); }
   .quiz-feedback.miss { color: var(--acidemic); }
+  .quiz-feedback.info { color: var(--accent); }
 
   .calc-row { display: flex; gap: 14px; flex-wrap: wrap; margin: 4px 0 12px; }
   .calc-field { display: flex; flex-direction: column; gap: 4px; }
@@ -286,7 +287,8 @@ function analyze(input) {
     conversion = { raw: { pH: pHin, pCO2: pCO2in, HCO3: HCO3gasIn }, converted: c };
   } else { pH = pHin; pCO2 = pCO2in; HCO3gas = HCO3gasIn; }
   const HCO3forAG = (HCO3cmp !== null && HCO3cmp !== undefined) ? HCO3cmp : HCO3gas;
-  const gasCmpDiscrepancy = (HCO3cmp !== null && HCO3cmp !== undefined) && Math.abs(HCO3cmp - HCO3gas) > 3;
+  const gasCmpDiff = (HCO3cmp !== null && HCO3cmp !== undefined) ? round(Math.abs(HCO3cmp - HCO3gas), 1) : null;
+  const gasCmpDiscrepancy = gasCmpDiff !== null && gasCmpDiff > 4;
   const st = stateOf(pH);
   const AG = anionGap(Na, Cl, HCO3forAG);
   const expNormalAG = expectedNormalAG(Albumin);
@@ -294,6 +296,16 @@ function analyze(input) {
   const sid = SID(Na, Cl);
   const sidClass = classifySID(sid);
   const correctedCa = correctedCalcium(Ca, Albumin);
+
+  // Lactate contributes to the anion gap at roughly 1:1 (mEq/L AG rise per
+  // mmol/L lactate rise above a ~1.0 mmol/L baseline) — see the reference in
+  // the footer. Real but imperfect: treat as an estimate, not precise accounting.
+  const lactate = input.Lactate;
+  const lactateElevated = lactate >= 2.0;
+  const lactateSevere = lactate >= 4.0;
+  const lactateClass = lactateElevated ? "high" : "normal";
+  const lactateAGContribution = lactateElevated ? round(lactate - 1.0, 1) : 0;
+
   const pCO2Abnormal = pCO2 < 35 || pCO2 > 45;
   const HCO3Abnormal = HCO3gas < 22 || HCO3gas > 26;
   const processes = [];
@@ -363,18 +375,37 @@ function analyze(input) {
 
   const predictedPH = round(hhPH(pCO2, HCO3gas), 3);
   const phDiscrepancy = round(pH - predictedPH, 3);
-  const inconsistent = Math.abs(phDiscrepancy) > INCONSISTENCY_TOLERANCE;
+  const hhInconsistent = Math.abs(phDiscrepancy) > INCONSISTENCY_TOLERANCE;
+  const inconsistent = hhInconsistent || gasCmpDiscrepancy;
   let inconsistencyMessage = null;
   if (inconsistent) {
-    const hasAcidosisProcess = processes.some(p => p.label.includes("acidosis"));
-    const hasAlkalosisProcess = processes.some(p => p.label.includes("alkalosis"));
-    let directionNote = "";
-    if (st === "Acidemia" && hasAlkalosisProcess && !hasAcidosisProcess) directionNote = " An acidemic pH can't be produced by alkalosis-only processes.";
-    else if (st === "Alkalemia" && hasAcidosisProcess && !hasAlkalosisProcess) directionNote = " An alkalemic pH can't be produced by acidosis-only processes.";
-    inconsistencyMessage = "Not a realistic case: PaCO2 " + pCO2 + " and HCO3 " + HCO3gas + " predict a pH near " + predictedPH.toFixed(2) + ", but pH is " + pH.toFixed(2) + " — a difference of " + Math.abs(phDiscrepancy).toFixed(2) + ", too large for one real blood gas." + directionNote;
+    const reasons = [];
+    if (hhInconsistent) {
+      const hasAcidosisProcess = processes.some(p => p.label.includes("acidosis"));
+      const hasAlkalosisProcess = processes.some(p => p.label.includes("alkalosis"));
+      let directionNote = "";
+      if (st === "Acidemia" && hasAlkalosisProcess && !hasAcidosisProcess) directionNote = " An acidemic pH can't be produced by alkalosis-only processes.";
+      else if (st === "Alkalemia" && hasAcidosisProcess && !hasAlkalosisProcess) directionNote = " An alkalemic pH can't be produced by acidosis-only processes.";
+      reasons.push("PaCO2 " + pCO2 + " and HCO3 " + HCO3gas + " predict a pH near " + predictedPH.toFixed(2) + ", but pH is " + pH.toFixed(2) + " — a difference of " + Math.abs(phDiscrepancy).toFixed(2) + ", too large for one real blood gas." + directionNote);
+    }
+    if (gasCmpDiscrepancy) {
+      reasons.push("Blood gas HCO3 (" + HCO3gas + ") and chemistry CO2 (" + HCO3cmp + ") differ by " + gasCmpDiff + " mmol/L — more than two samples from the same patient, drawn close together, can realistically differ.");
+    }
+    inconsistencyMessage = "Not a realistic case: " + reasons.join(" ");
   }
 
-  return { pH, pCO2, HCO3gas, conversion, gasCmpDiscrepancy, state: st, AG, expNormalAG, hasHighAG, sid, sidClass, correctedCa, processes, noDisorder, normalPHWithAbnormalGas: st === "Normal" && !noDisorder, predictedPH, phDiscrepancy, inconsistent, inconsistencyMessage };
+  let lactateNote = null;
+  if (lactateElevated) {
+    if (hasHighAG) {
+      const gapElevation = round(AG - expNormalAG, 1);
+      const pct = gapElevation > 0 ? Math.round(Math.min(100, (lactateAGContribution / gapElevation) * 100)) : null;
+      lactateNote = "Lactate " + lactate + " mmol/L is elevated" + (lactateSevere ? " (severe)" : "") + " and can account for roughly " + lactateAGContribution + " mEq/L of the " + gapElevation + " mEq/L anion gap elevation" + (pct !== null ? " (~" + pct + "%)" : "") + " — using the ~1:1 mEq/L rise in AG per mmol/L rise in lactate above a ~1.0 mmol/L baseline. That correlation is real but imperfect (R² roughly 0.3–0.6 across studies) — any gap it doesn't explain may reflect other unmeasured anions.";
+    } else {
+      lactateNote = "Lactate " + lactate + " mmol/L is elevated" + (lactateSevere ? " (severe)" : "") + " even though the raw anion gap isn't flagged high — check the Expected normal AG for a masked gap (e.g. from hypoalbuminemia) before assuming lactate isn't contributing.";
+    }
+  }
+
+  return { pH, pCO2, HCO3gas, conversion, gasCmpDiscrepancy, gasCmpDiff, state: st, AG, expNormalAG, hasHighAG, sid, sidClass, correctedCa, lactate, lactateElevated, lactateSevere, lactateClass, lactateAGContribution, lactateNote, processes, noDisorder, normalPHWithAbnormalGas: st === "Normal" && !noDisorder, predictedPH, phDiscrepancy, inconsistent, inconsistencyMessage };
 }
 
 const DIFFERENTIALS = {
@@ -510,37 +541,37 @@ function hhPH(pCO2, HCO3) { return 6.1 + Math.log10(HCO3 / (0.03 * pCO2)); }
 
 const CASES = [
   { teaser: "Routine pre-op labs, asymptomatic", dx: "Normal acid–base status", stem: "34-year-old healthy volunteer, routine pre-operative labs before an elective knee scope. No symptoms.", story: "Nothing to explain — gas and chemistry are consistent with normal acid–base physiology. Included as the baseline every other case is read against.",
-    input:{source:"arterial",pH:7.40,pCO2:40,HCO3gas:24,Na:140,Cl:104,K:4.0,Ca:9.5,Albumin:4.0,HCO3cmp:24} },
+    input:{source:"arterial",pH:7.40,pCO2:40,HCO3gas:24,Lactate:1.0,Na:140,Cl:104,K:4.0,Ca:9.5,Albumin:4.0,HCO3cmp:24} },
   { teaser: "T1DM, 2 days vomiting + polyuria, tachypneic", dx: "Diabetic ketoacidosis", stem: "22-year-old woman with type 1 diabetes, two days of vomiting, polyuria, and abdominal pain, now tachypneic with a fruity odor on her breath.", story: "Pure high-anion-gap metabolic acidosis from ketoacidosis, with respiratory compensation (Kussmaul breathing) landing exactly where Winter's formula predicts — no second process to chase.",
-    input:{source:"arterial",pH:7.15,pCO2:20,HCO3gas:8,Na:132,Cl:90,K:5.2,Ca:9.0,Albumin:3.5,HCO3cmp:8} },
+    input:{source:"arterial",pH:7.15,pCO2:20,HCO3gas:8,Lactate:1.4,Na:132,Cl:90,K:5.2,Ca:9.0,Albumin:3.5,HCO3cmp:8} },
   { teaser: "5 days of watery diarrhea", dx: "GI bicarbonate loss", stem: "45-year-old man with five days of profuse watery diarrhea, otherwise previously well.", story: "Normal-anion-gap (hyperchloremic) metabolic acidosis from GI bicarbonate loss, appropriately compensated by hyperventilation. The hypokalemia fits GI losses better than a hyperkalemic RTA.",
-    input:{source:"arterial",pH:7.30,pCO2:30,HCO3gas:14,Na:138,Cl:112,K:3.2,Ca:9.2,Albumin:4.0,HCO3cmp:14} },
+    input:{source:"arterial",pH:7.30,pCO2:30,HCO3gas:14,Lactate:1.0,Na:138,Cl:112,K:3.2,Ca:9.2,Albumin:4.0,HCO3cmp:14} },
   { teaser: "3 days vomiting, small bowel obstruction", dx: "Chloride-responsive metabolic alkalosis", stem: "60-year-old woman with three days of intractable vomiting from a small bowel obstruction.", story: "Chloride-responsive metabolic alkalosis from loss of gastric HCl, with the expected hypoventilatory response. The hypochloremic, hypokalemic pattern is the textbook picture of vomiting-driven alkalosis.",
-    input:{source:"arterial",pH:7.52,pCO2:48,HCO3gas:38,Na:140,Cl:88,K:3.0,Ca:9.6,Albumin:4.2,HCO3cmp:38} },
+    input:{source:"arterial",pH:7.52,pCO2:48,HCO3gas:38,Lactate:1.1,Na:140,Cl:88,K:3.0,Ca:9.6,Albumin:4.2,HCO3cmp:38} },
   { teaser: "Found unresponsive, pinpoint pupils", dx: "Opioid overdose", stem: "28-year-old man found unresponsive with pinpoint pupils after a witnessed heroin injection.", story: "Acute respiratory acidosis from opioid-induced hypoventilation — too little time has passed for meaningful renal bicarbonate retention, so HCO3 is only just starting to rise.",
-    input:{source:"arterial",pH:7.25,pCO2:60,HCO3gas:26,Na:140,Cl:100,K:4.0,Ca:9.5,Albumin:4.0,HCO3cmp:26} },
+    input:{source:"arterial",pH:7.25,pCO2:60,HCO3gas:26,Lactate:1.0,Na:140,Cl:100,K:4.0,Ca:9.5,Albumin:4.0,HCO3cmp:26} },
   { teaser: "Severe COPD, presenting at baseline", dx: "Chronic respiratory acidosis (COPD)", stem: "68-year-old man with severe COPD and a long history of CO2 retention, presenting at what his family says is his usual baseline.", story: "Chronic respiratory acidosis with renal bicarbonate retention right on the 10/4 rule — this is his normal, not an acute decompensation, which is exactly why the pH is only mildly low despite a PaCO2 of 70.",
-    input:{source:"arterial",pH:7.32,pCO2:70,HCO3gas:35,Na:140,Cl:93,K:4.2,Ca:9.4,Albumin:3.8,HCO3cmp:35} },
+    input:{source:"arterial",pH:7.32,pCO2:70,HCO3gas:35,Lactate:1.0,Na:140,Cl:93,K:4.2,Ca:9.4,Albumin:3.8,HCO3cmp:35} },
   { teaser: "Sudden pleuritic chest pain after a flight", dx: "Pulmonary embolism (respiratory alkalosis)", stem: "26-year-old woman with sudden pleuritic chest pain and tachypnea after a long-haul flight, visibly anxious.", story: "Acute respiratory alkalosis. Anxiety alone could produce this picture, but the pleuritic pain and recent immobilization make pulmonary embolism the diagnosis that must not be missed.",
-    input:{source:"arterial",pH:7.52,pCO2:26,HCO3gas:21,Na:140,Cl:106,K:3.8,Ca:9.5,Albumin:4.0,HCO3cmp:21} },
+    input:{source:"arterial",pH:7.52,pCO2:26,HCO3gas:21,Lactate:1.2,Na:140,Cl:106,K:3.8,Ca:9.5,Albumin:4.0,HCO3cmp:21} },
   { teaser: "Cirrhosis, routine outpatient labs, feels well", dx: "Chronic respiratory alkalosis of liver disease", stem: "55-year-old woman with cirrhosis, seen for routine outpatient labs. She feels well.", story: "Chronic respiratory alkalosis (the hyperventilation of chronic liver disease) with renal compensation bringing the pH essentially into the normal range. A normal pH here is quietly hiding a real, chronic process — exactly the trap take-home point #2 warns about.",
-    input:{source:"arterial",pH:7.44,pCO2:28,HCO3gas:19,Na:140,Cl:108,K:4.0,Ca:9.4,Albumin:4.0,HCO3cmp:19} },
+    input:{source:"arterial",pH:7.44,pCO2:28,HCO3gas:19,Lactate:1.6,Na:140,Cl:108,K:4.0,Ca:9.4,Albumin:4.0,HCO3cmp:19} },
   { teaser: "T1DM + 3-day diarrheal illness, missed insulin", dx: "DKA + diarrhea (combined acidosis)", stem: "19-year-old woman with type 1 diabetes, three days of diarrheal illness on top of several missed insulin doses.", story: "Two acidoses stacked on each other: high-anion-gap ketoacidosis from missed insulin, plus a normal-anion-gap component from diarrheal bicarbonate loss. The delta ratio (0.4–0.8) is what reveals the second process — the gap alone doesn't fully explain how low the HCO3 has fallen.",
-    input:{source:"arterial",pH:null,pCO2:19,HCO3gas:7,Na:135,Cl:108,K:4.5,Ca:9.0,Albumin:3.0,HCO3cmp:7} },
+    input:{source:"arterial",pH:null,pCO2:19,HCO3gas:7,Lactate:1.7,Na:135,Cl:108,K:4.5,Ca:9.0,Albumin:3.0,HCO3cmp:7} },
   { teaser: "T1DM with vomiting x2 days", dx: "DKA + vomiting (acidosis + concurrent alkalosis)", stem: "24-year-old woman with DKA who has also been vomiting for two days.", story: "High-anion-gap ketoacidosis with a concurrent metabolic alkalosis from vomiting partially restoring the HCO3. The raw HCO3 looks less severe than the gap alone predicts — the delta ratio (>2) is the only way to see the hidden alkalosis underneath.",
-    input:{source:"arterial",pH:null,pCO2:35,HCO3gas:18,Na:138,Cl:90,K:3.2,Ca:9.4,Albumin:3.5,HCO3cmp:18} },
+    input:{source:"arterial",pH:null,pCO2:35,HCO3gas:18,Lactate:1.5,Na:138,Cl:90,K:3.2,Ca:9.4,Albumin:3.5,HCO3cmp:18} },
   { teaser: "Large aspirin ingestion, tinnitus", dx: "Salicylate toxicity", stem: "17-year-old girl with an intentional large aspirin ingestion, tinnitus, and rapid, deep breathing.", story: "The classic mixed picture: a high-anion-gap metabolic acidosis (salicylates, lactate, ketones) plus a primary respiratory alkalosis from direct stimulation of the medullary respiratory center. The hyperventilation is more than the acidosis alone would drive — that gap between measured and expected PaCO2 is the tell.",
-    input:{source:"arterial",pH:null,pCO2:20,HCO3gas:14,Na:140,Cl:100,K:3.8,Ca:9.5,Albumin:4.0,HCO3cmp:14} },
+    input:{source:"arterial",pH:null,pCO2:20,HCO3gas:14,Lactate:3.2,Na:140,Cl:100,K:3.8,Ca:9.5,Albumin:4.0,HCO3cmp:14} },
   { teaser: "T1DM + vomiting, venous line only", dx: "DKA, read from a venous gas", stem: "30-year-old man with type 1 diabetes and vomiting; only a venous line is available in a busy emergency department.", story: "High-anion-gap metabolic acidosis, read from a venous sample converted to an arterial-equivalent. Reasonable for screening and trending, but confirm with an ABG if the respiratory status itself is in question — venous PaCO2 correlates with arterial less reliably than pH or HCO3 do.",
-    input:{source:"venous",pH:7.25,pCO2:39,HCO3gas:17.5,Na:136,Cl:100,K:5.0,Ca:9.0,Albumin:4.0,HCO3cmp:20} },
+    input:{source:"venous",pH:7.25,pCO2:39,HCO3gas:17.5,Lactate:1.6,Na:136,Cl:100,K:5.0,Ca:9.0,Albumin:4.0,HCO3cmp:20} },
   { teaser: "Septic shock, malnourished, low albumin", dx: "Lactic acidosis unmasked by albumin correction", stem: "71-year-old man in septic shock, chronically malnourished with a low serum albumin.", story: "The raw anion gap reads as textbook-normal — but his albumin is low, and a low albumin lowers the expected baseline gap. Correcting for it unmasks a real, active lactic acidosis. Take-home point #8: always correct the gap in critically ill, hypoalbuminemic patients.",
-    input:{source:"arterial",pH:null,pCO2:32,HCO3gas:16,Na:138,Cl:110,K:4.0,Ca:8.0,Albumin:2.0,HCO3cmp:16} },
+    input:{source:"arterial",pH:null,pCO2:32,HCO3gas:16,Lactate:7.0,Na:138,Cl:110,K:4.0,Ca:8.0,Albumin:2.0,HCO3cmp:16} },
   { teaser: "Diabetic nephropathy, new ACE inhibitor", dx: "RTA type IV (hypoaldosteronism)", stem: "58-year-old man with diabetic nephropathy, recently started on an ACE inhibitor, found to have a mild metabolic acidosis with hyperkalemia.", story: "Normal-anion-gap metabolic acidosis with hyperkalemia — the opposite potassium pattern from GI loss or classic RTA. This combination points to hypoaldosteronism / RTA type IV, a common finding in diabetic nephropathy and with ACE inhibitor use.",
-    input:{source:"arterial",pH:null,pCO2:33,HCO3gas:16,Na:138,Cl:112,K:5.8,Ca:9.5,Albumin:4.0,HCO3cmp:16} },
+    input:{source:"arterial",pH:null,pCO2:33,HCO3gas:16,Lactate:1.0,Na:138,Cl:112,K:5.8,Ca:9.5,Albumin:4.0,HCO3cmp:16} },
   { teaser: "Post-ROSC after 20 minutes of CPR", dx: "Combined metabolic + respiratory acidosis (arrest physiology)", stem: "63-year-old man who just achieved return of spontaneous circulation after 20 minutes of CPR.", story: "Combined metabolic (lactic) and respiratory acidosis, both primary and pulling the same direction at once — tissue hypoperfusion during the arrest and inadequate ventilation are additive here, not compensating for one another. Nothing about this pattern is 'compensation.'",
-    input:{source:"arterial",pH:7.05,pCO2:55,HCO3gas:15,Na:140,Cl:100,K:5.5,Ca:9.0,Albumin:4.0,HCO3cmp:15} },
+    input:{source:"arterial",pH:7.05,pCO2:55,HCO3gas:15,Lactate:9.5,Na:140,Cl:100,K:5.5,Ca:9.0,Albumin:4.0,HCO3cmp:15} },
   { teaser: "Cirrhosis + ascites on diuretics, encephalopathic", dx: "Combined metabolic + respiratory alkalosis", stem: "50-year-old woman with cirrhosis and ascites on diuretics, now encephalopathic and hyperventilating.", story: "Combined metabolic alkalosis (diuretic-driven) and respiratory alkalosis (hepatic-encephalopathy-driven hyperventilation), both primary and both pulling toward alkalemia at the same time — again, not compensation, two processes stacked in the same direction.",
-    input:{source:"arterial",pH:7.58,pCO2:30,HCO3gas:32,Na:140,Cl:94,K:3.0,Ca:9.5,Albumin:4.0,HCO3cmp:32} },
+    input:{source:"arterial",pH:7.58,pCO2:30,HCO3gas:32,Lactate:1.8,Na:140,Cl:94,K:3.0,Ca:9.5,Albumin:4.0,HCO3cmp:32} },
 ];
 CASES.forEach(c => { if (c.input.pH === null) c.input.pH = Math.round(hhPH(c.input.pCO2, c.input.HCO3gas) * 100) / 100; });
 // Integrity check, not a user-facing feature: every case's own numbers must be
@@ -568,9 +599,9 @@ function renderCaseData() {
   const inp = c.input;
   document.getElementById("source-tag").textContent = inp.source === "venous" ? "Venous sample" : "Arterial sample";
   document.getElementById("gas-kv").innerHTML =
-    kv("pH", inp.pH) + kv("PaCO&#8322;", inp.pCO2, "mmHg") + kv("HCO&#8323;&#8315;", inp.HCO3gas, "mmol/L");
+    kv("pH", inp.pH) + kv("PaCO&#8322;", inp.pCO2, "mmHg") + kv("HCO&#8323;&#8315;", inp.HCO3gas, "mmol/L") + kv("Lactate", inp.Lactate, "mmol/L");
   document.getElementById("cmp-kv").innerHTML =
-    kv("Na&#8314;", inp.Na) + kv("Cl&#8315;", inp.Cl) + kv("K&#8314;", inp.K) + kv("Ca", inp.Ca) + kv("Albumin", inp.Albumin) + kv("HCO&#8323;&#8315;", inp.HCO3cmp);
+    kv("Na&#8314;", inp.Na) + kv("Cl&#8315;", inp.Cl) + kv("K&#8314;", inp.K) + kv("Ca", inp.Ca) + kv("Albumin", inp.Albumin) + kv("CO&#8322;", inp.HCO3cmp);
   document.getElementById("case-counter").textContent = "Case " + (idx+1) + " of " + CASES.length;
   sel.value = idx;
 }
@@ -694,10 +725,14 @@ function showProcess() {
     '<div class="metric"><div class="m-label">Expected normal AG</div><div class="m-value">' + r.expNormalAG + '</div></div>' +
     '<div class="metric ' + (r.sidClass === "low" ? "flag-high" : r.sidClass === "high" ? "flag-low" : "flag-ok") + '"><div class="m-label">SID (Na&minus;Cl)</div><div class="m-value">' + r.sid + '</div></div>' +
     '<div class="metric"><div class="m-label">Corrected Ca</div><div class="m-value">' + r.correctedCa + '</div></div>' +
+    '<div class="metric ' + (r.lactateElevated ? "flag-high" : "flag-ok") + '"><div class="m-label">Lactate</div><div class="m-value">' + r.lactate + '</div></div>' +
   '</div>';
 
   if (r.hasHighAG && r.AG <= 16 && c.input.Albumin < 3.5) {
     html += '<div class="quiz-feedback miss" style="margin-bottom:8px;">Raw AG (' + r.AG + ') looks normal, but albumin ' + c.input.Albumin + ' g/dL lowers this patient\'s expected-normal AG (3&times;albumin &asymp; ' + r.expNormalAG + ') &mdash; against that baseline, it\'s actually elevated.</div>';
+  }
+  if (r.lactateNote) {
+    html += '<div class="quiz-feedback info" style="margin-bottom:8px;">' + r.lactateNote + '</div>';
   }
 
   if (r.noDisorder) {
