@@ -93,6 +93,8 @@
     background: var(--paper); color: var(--ink); width: 100%;
   }
   .field input:focus { outline: 2px solid var(--focus); outline-offset: 1px; border-color: var(--focus); }
+  .field input.field-error { border-color: var(--danger); background: var(--danger-soft); }
+  .field input.field-error:focus { outline-color: var(--danger); }
 
   .segmented {
     display: inline-flex; border: 1px solid var(--line-strong); border-radius: 7px; overflow: hidden; margin-bottom: 14px;
@@ -273,7 +275,10 @@
           <div class="field"><label for="in-pH">pH</label><input id="in-pH" type="number" step="0.01" value="7.15"></div>
           <div class="field"><label for="in-pco2">PaCO&#8322; <span class="unit">mmHg</span></label><input id="in-pco2" type="number" step="0.1" value="20"></div>
         </div>
-        <div class="field"><label for="in-hco3gas">HCO&#8323;&#8315; <span class="unit">mmol/L, from gas</span></label><input id="in-hco3gas" type="number" step="0.1" value="8"></div>
+        <div class="field-row">
+          <div class="field"><label for="in-hco3gas">HCO&#8323;&#8315; <span class="unit">mmol/L, from gas</span></label><input id="in-hco3gas" type="number" step="0.1" value="8"></div>
+          <div class="field"><label for="in-lactate">Lactate <span class="unit">mmol/L</span></label><input id="in-lactate" type="number" step="0.1" value="1.4"></div>
+        </div>
 
         <div id="conversion-note" class="conversion-note" hidden></div>
 
@@ -284,14 +289,18 @@
         </div>
         <div class="field-row">
           <div class="field"><label for="in-k">K&#8314; <span class="unit">mEq/L</span></label><input id="in-k" type="number" step="0.1" value="5.2"></div>
-          <div class="field"><label for="in-hco3cmp">HCO&#8323;&#8315; <span class="unit">mmol/L, serum/CMP</span></label><input id="in-hco3cmp" type="number" step="0.1" value="8"></div>
+          <div class="field"><label for="in-hco3cmp">CO&#8322; <span class="unit">mmol/L, serum/CMP</span></label><input id="in-hco3cmp" type="number" step="0.1" value="8"></div>
         </div>
         <div class="field-row">
           <div class="field"><label for="in-ca">Ca <span class="unit">mg/dL, total</span></label><input id="in-ca" type="number" step="0.1" value="9.0"></div>
           <div class="field"><label for="in-alb">Albumin <span class="unit">g/dL</span></label><input id="in-alb" type="number" step="0.1" value="3.5"></div>
         </div>
 
-        <button class="btn primary" id="analyze-btn" style="width:100%; margin-top:6px;">Analyze</button>
+        <div id="missing-fields-callout" class="callout error" hidden></div>
+        <div style="display:flex; gap:8px; margin-top:6px;">
+          <button class="btn primary" id="analyze-btn" style="flex:1;">Analyze</button>
+          <button class="btn" id="reset-btn">Reset</button>
+        </div>
       </section>
     </div>
 
@@ -306,7 +315,6 @@
         <div class="emia-note"><b>&#8211;emia</b> describes the patient's current blood pH. <b>&#8211;osis</b> describes a process acting on it &mdash; a patient's state can be acidemia, alkalemia, <em>or normal</em>, while one or more &#8211;osis processes are still underway.</div>
         <div id="inconsistency-callout" class="callout error" hidden></div>
         <div id="normal-ph-callout" class="callout warn" hidden>Normal pH does not exclude major acid&#8211;base abnormality &mdash; see Process below.</div>
-        <div id="discrepancy-callout" class="callout warn" hidden></div>
       </section>
 
       <section class="panel">
@@ -334,8 +342,14 @@
             <div class="m-value" id="ca-value">&mdash;</div>
             <div class="m-detail">mg/dL, albumin-adjusted</div>
           </div>
+          <div class="metric" id="metric-lactate">
+            <div class="m-label">Lactate</div>
+            <div class="m-value" id="lactate-value">&mdash;</div>
+            <div class="m-detail" id="lactate-detail">&mdash;</div>
+          </div>
         </div>
         <div id="ag-mask-callout" class="callout info" hidden></div>
+        <div id="lactate-callout" class="callout info" hidden></div>
 
         <div id="process-list"></div>
       </section>
@@ -362,7 +376,7 @@
   </section>
 
   <footer class="site">
-    Want to practice? The <a href="teaching-cases.html">Learning Cases</a> walkthrough steps through 16 verified vignettes one at a time. Framework adapted from Dr. Sara Crager, <em>Acid&#8211;Base</em>, <a href="https://www.criticalcaretime.com/episodes/art-lines-t4k5m-ht3hb" target="_blank" rel="noopener">Critical Care Time&nbsp;episode&nbsp;84</a> (referencing ICUedu's Approach to Acid&#8211;Base). Compensation formulas (Winter's, 10/4 rule, acute/chronic bands) are standard Boston-approach teaching values with typical &plusmn; tolerances &mdash; treat every range as a guide, not a verdict. Venous&rarr;arterial conversion uses commonly cited bedside offsets (pH +0.03, PaCO&#8322; &minus;5, HCO&#8323;&#8315; &minus;1.5) and is an estimate.
+    Want to practice? The <a href="teaching-cases.html">Learning Cases</a> walkthrough steps through 16 verified vignettes one at a time. Framework adapted from Dr. Sara Crager, <em>Acid&#8211;Base</em>, <a href="https://www.criticalcaretime.com/episodes/art-lines-t4k5m-ht3hb" target="_blank" rel="noopener">Critical Care Time&nbsp;episode&nbsp;84</a> (referencing ICUedu's Approach to Acid&#8211;Base). Compensation formulas (Winter's, 10/4 rule, acute/chronic bands) are standard Boston-approach teaching values with typical &plusmn; tolerances &mdash; treat every range as a guide, not a verdict. Venous&rarr;arterial conversion uses commonly cited bedside offsets (pH +0.03, PaCO&#8322; &minus;5, HCO&#8323;&#8315; &minus;1.5) and is an estimate. Lactate's contribution to the anion gap is modeled at roughly 1:1 (mEq/L AG rise per mmol/L lactate rise above a ~1.0 mmol/L baseline), per Sam et al. 2026 (slope 0.98, 95% CI 0.89&minus;1.06, R&sup2;=0.60 at higher lactate) &mdash; the correlation is weaker and more variable at lower lactate levels (R&sup2;&asymp;0.3 in other cohorts), so treat it as an estimate of contribution, not a precise accounting.
   </footer>
 
 </main>
@@ -415,7 +429,8 @@ function analyze(input) {
   } else { pH = pHin; pCO2 = pCO2in; HCO3gas = HCO3gasIn; }
 
   const HCO3forAG = (HCO3cmp !== null && HCO3cmp !== undefined) ? HCO3cmp : HCO3gas;
-  const gasCmpDiscrepancy = (HCO3cmp !== null && HCO3cmp !== undefined) && Math.abs(HCO3cmp - HCO3gas) > 3;
+  const gasCmpDiff = (HCO3cmp !== null && HCO3cmp !== undefined) ? round(Math.abs(HCO3cmp - HCO3gas), 1) : null;
+  const gasCmpDiscrepancy = gasCmpDiff !== null && gasCmpDiff > 4;
 
   const st = stateOf(pH);
   const AG = anionGap(Na, Cl, HCO3forAG);
@@ -424,6 +439,17 @@ function analyze(input) {
   const sid = SID(Na, Cl);
   const sidClass = classifySID(sid);
   const correctedCa = correctedCalcium(Ca, Albumin);
+
+  // Lactate: an elevated lactate is itself an unmeasured anion, so it contributes
+  // to the anion gap almost 1:1 — each ~1 mmol/L rise in lactate above a normal
+  // baseline (~1 mmol/L) tracks with a roughly 1 mEq/L rise in AG (Sam et al. 2026,
+  // slope 0.98 mEq/L per mmol/L, R2=0.60 at higher lactate; other cohorts show a
+  // weaker, more variable correlation, R2~0.3, at lower levels — real but imperfect).
+  const lactate = input.Lactate;
+  const lactateElevated = lactate >= 2.0;
+  const lactateSevere = lactate >= 4.0;
+  const lactateClass = lactateElevated ? "high" : "normal";
+  const lactateAGContribution = lactateElevated ? round(lactate - 1.0, 1) : 0;
 
   const pCO2Abnormal = pCO2 < 35 || pCO2 > 45;
   const HCO3Abnormal = HCO3gas < 22 || HCO3gas > 26;
@@ -515,25 +541,49 @@ function analyze(input) {
 
   const predictedPH = round(hhPH(pCO2, HCO3gas), 3);
   const phDiscrepancy = round(pH - predictedPH, 3);
-  const inconsistent = Math.abs(phDiscrepancy) > INCONSISTENCY_TOLERANCE;
+  const hhInconsistent = Math.abs(phDiscrepancy) > INCONSISTENCY_TOLERANCE;
+  const inconsistent = hhInconsistent || gasCmpDiscrepancy;
   let inconsistencyMessage = null;
   if (inconsistent) {
-    const hasAcidosisProcess = processes.some(p => p.label.includes("acidosis"));
-    const hasAlkalosisProcess = processes.some(p => p.label.includes("alkalosis"));
-    let directionNote = "";
-    if (st === "Acidemia" && hasAlkalosisProcess && !hasAcidosisProcess) {
-      directionNote = " An acidemic pH can't be produced by alkalosis-only processes.";
-    } else if (st === "Alkalemia" && hasAcidosisProcess && !hasAlkalosisProcess) {
-      directionNote = " An alkalemic pH can't be produced by acidosis-only processes.";
+    const reasons = [];
+    if (hhInconsistent) {
+      const hasAcidosisProcess = processes.some(p => p.label.includes("acidosis"));
+      const hasAlkalosisProcess = processes.some(p => p.label.includes("alkalosis"));
+      let directionNote = "";
+      if (st === "Acidemia" && hasAlkalosisProcess && !hasAcidosisProcess) {
+        directionNote = " An acidemic pH can't be produced by alkalosis-only processes.";
+      } else if (st === "Alkalemia" && hasAcidosisProcess && !hasAlkalosisProcess) {
+        directionNote = " An alkalemic pH can't be produced by acidosis-only processes.";
+      }
+      reasons.push("PaCO2 " + pCO2 + " and HCO3 " + HCO3gas + " predict a pH near " + predictedPH.toFixed(2) +
+        ", but you entered pH " + pH.toFixed(2) + " — a difference of " + Math.abs(phDiscrepancy).toFixed(2) +
+        ", too large for one real blood gas." + directionNote);
     }
-    inconsistencyMessage = "Not a realistic case: PaCO2 " + pCO2 + " and HCO3 " + HCO3gas + " predict a pH near " +
-      predictedPH.toFixed(2) + ", but you entered pH " + pH.toFixed(2) + " — a difference of " +
-      Math.abs(phDiscrepancy).toFixed(2) + ", too large for one real blood gas." + directionNote +
-      " Double-check the pH, PaCO2, and HCO3 you entered.";
+    if (gasCmpDiscrepancy) {
+      reasons.push("Blood gas HCO3 (" + HCO3gas + ") and chemistry CO2 (" + HCO3cmp + ") differ by " + gasCmpDiff +
+        " mmol/L — more than two samples from the same patient, drawn close together, can realistically differ.");
+    }
+    inconsistencyMessage = "Not a realistic case: " + reasons.join(" ") + " Double-check the values you entered.";
   }
 
-  return { pH, pCO2, HCO3gas, conversion, gasCmpDiscrepancy, state: st, AG, expNormalAG, hasHighAG,
-    sid, sidClass, correctedCa, processes, noDisorder, normalPHWithAbnormalGas: st === "Normal" && !noDisorder,
+  let lactateNote = null;
+  if (lactateElevated) {
+    if (hasHighAG) {
+      const gapElevation = round(AG - expNormalAG, 1);
+      const pct = gapElevation > 0 ? Math.round(Math.min(100, (lactateAGContribution / gapElevation) * 100)) : null;
+      lactateNote = "Lactate " + lactate + " mmol/L is elevated" + (lactateSevere ? " (severe)" : "") +
+        " and can account for roughly " + lactateAGContribution + " mEq/L of the " + gapElevation +
+        " mEq/L anion gap elevation" + (pct !== null ? " (~" + pct + "%)" : "") +
+        " — using the ~1:1 mEq/L rise in AG per mmol/L rise in lactate above a ~1.0 mmol/L baseline. That correlation is real but imperfect (R² roughly 0.3–0.6 across studies) — any gap it doesn't explain may reflect other unmeasured anions.";
+    } else {
+      lactateNote = "Lactate " + lactate + " mmol/L is elevated" + (lactateSevere ? " (severe)" : "") +
+        " even though the raw anion gap isn't flagged high — check the Expected normal AG below for a masked gap (e.g. from hypoalbuminemia) before assuming lactate isn't contributing.";
+    }
+  }
+
+  return { pH, pCO2, HCO3gas, conversion, gasCmpDiscrepancy, gasCmpDiff, state: st, AG, expNormalAG, hasHighAG,
+    sid, sidClass, correctedCa, lactate, lactateElevated, lactateSevere, lactateClass, lactateAGContribution,
+    lactateNote, processes, noDisorder, normalPHWithAbnormalGas: st === "Normal" && !noDisorder,
     predictedPH, phDiscrepancy, inconsistent, inconsistencyMessage };
 }
 
@@ -562,7 +612,12 @@ function differentialFor(p) {
 /* ============================== UI WIRING ============================== */
 
 const els = {};
-["in-pH","in-pco2","in-hco3gas","in-na","in-cl","in-k","in-hco3cmp","in-ca","in-alb"].forEach(id => els[id] = document.getElementById(id));
+const REQUIRED_FIELD_IDS = ["in-pH","in-pco2","in-hco3gas","in-lactate","in-na","in-cl","in-k","in-hco3cmp","in-ca","in-alb"];
+const FIELD_LABELS = {
+  "in-pH": "pH", "in-pco2": "PaCO2", "in-hco3gas": "HCO3 (blood gas)", "in-lactate": "Lactate", "in-na": "Na",
+  "in-cl": "Cl", "in-k": "K", "in-hco3cmp": "CO2 (chemistry)", "in-ca": "Ca", "in-alb": "Albumin"
+};
+REQUIRED_FIELD_IDS.forEach(id => els[id] = document.getElementById(id));
 let currentSource = "arterial";
 
 function readInputs() {
@@ -571,6 +626,7 @@ function readInputs() {
     pH: parseFloat(els["in-pH"].value),
     pCO2: parseFloat(els["in-pco2"].value),
     HCO3gas: parseFloat(els["in-hco3gas"].value),
+    Lactate: parseFloat(els["in-lactate"].value),
     Na: parseFloat(els["in-na"].value),
     Cl: parseFloat(els["in-cl"].value),
     K: parseFloat(els["in-k"].value),
@@ -731,11 +787,6 @@ function render(result, input) {
   } else incEl.hidden = true;
 
   document.getElementById("normal-ph-callout").hidden = !result.normalPHWithAbnormalGas || result.inconsistent;
-  const discEl = document.getElementById("discrepancy-callout");
-  if (result.gasCmpDiscrepancy) {
-    discEl.hidden = false;
-    discEl.textContent = "Gas-derived HCO3 (" + result.HCO3gas + ") and CMP HCO3 (" + input.HCO3cmp + ") differ by more than 3 mmol/L — confirm both were drawn close together before trusting the anion gap.";
-  } else discEl.hidden = true;
 
   const conv = document.getElementById("conversion-note");
   if (result.conversion) {
@@ -764,6 +815,12 @@ function render(result, input) {
     maskEl.hidden = false;
     maskEl.textContent = "Raw AG (" + result.AG + ") reads as textbook-normal, but hypoalbuminemia (albumin " + input.Albumin + " g/dL) lowers this patient's expected-normal AG (3×albumin ≈ " + result.expNormalAG + ") — against that baseline, it's actually elevated.";
   } else maskEl.hidden = true;
+
+  document.getElementById("lactate-value").textContent = result.lactate;
+  document.getElementById("metric-lactate").className = "metric " + (result.lactateElevated ? "flag-high" : "flag-ok");
+  document.getElementById("lactate-detail").textContent = result.lactateSevere ? "severe (≥4.0 mmol/L)" : result.lactateElevated ? "elevated (≥2.0 mmol/L)" : "normal (<2.0 mmol/L)";
+  const lacEl = document.getElementById("lactate-callout");
+  if (result.lactateNote) { lacEl.hidden = false; lacEl.textContent = result.lactateNote; } else lacEl.hidden = true;
 
   const listEl = document.getElementById("process-list");
   listEl.innerHTML = "";
@@ -798,22 +855,94 @@ function setSource(src) {
   document.getElementById("src-arterial").classList.toggle("active", src === "arterial");
   document.getElementById("src-venous").classList.toggle("active", src === "venous");
 }
-document.getElementById("src-arterial").addEventListener("click", () => { setSource("arterial"); runAnalysis(); });
-document.getElementById("src-venous").addEventListener("click", () => { setSource("venous"); runAnalysis(); });
+// Switching gas source changes what the fields mean, so any prior result is
+// stale — clear the display, but (per design) don't re-run until Analyze is
+// clicked again.
+document.getElementById("src-arterial").addEventListener("click", () => { setSource("arterial"); resetResultsDisplay(); });
+document.getElementById("src-venous").addEventListener("click", () => { setSource("venous"); resetResultsDisplay(); });
 
+function clearFieldErrors() {
+  REQUIRED_FIELD_IDS.forEach(id => els[id].classList.remove("field-error"));
+  document.getElementById("missing-fields-callout").hidden = true;
+}
+
+function validateFields() {
+  const blanks = REQUIRED_FIELD_IDS.filter(id => els[id].value.trim() === "");
+  REQUIRED_FIELD_IDS.forEach(id => els[id].classList.toggle("field-error", blanks.indexOf(id) !== -1));
+  const cal = document.getElementById("missing-fields-callout");
+  if (blanks.length) {
+    cal.hidden = false;
+    cal.textContent = "Missing " + blanks.length + " required value" + (blanks.length > 1 ? "s" : "") + " (" +
+      blanks.map(id => FIELD_LABELS[id]).join(", ") + ") — fill in every field before analyzing.";
+    return false;
+  }
+  cal.hidden = true;
+  return true;
+}
+
+function resetResultsDisplay() {
+  const statePill = document.getElementById("state-pill");
+  statePill.textContent = "—"; statePill.className = "state-pill";
+  document.getElementById("state-ph-val").textContent = "—";
+  document.getElementById("inconsistency-callout").hidden = true;
+  document.getElementById("normal-ph-callout").hidden = true;
+  document.getElementById("conversion-note").hidden = true;
+  document.getElementById("ag-value").textContent = "—";
+  document.getElementById("ag-detail").textContent = "—";
+  document.getElementById("metric-ag").className = "metric";
+  document.getElementById("expag-value").textContent = "—";
+  document.getElementById("expag-detail").textContent = "—";
+  document.getElementById("metric-sid").className = "metric";
+  document.getElementById("sid-value").textContent = "—";
+  document.getElementById("sid-detail").textContent = "—";
+  document.getElementById("ca-value").textContent = "—";
+  document.getElementById("ag-mask-callout").hidden = true;
+  document.getElementById("lactate-value").textContent = "—";
+  document.getElementById("lactate-detail").textContent = "—";
+  document.getElementById("metric-lactate").className = "metric";
+  document.getElementById("lactate-callout").hidden = true;
+  const placeholder = '<div class="story-cue">Enter values and click Analyze.</div>';
+  document.getElementById("process-list").innerHTML = placeholder;
+  document.getElementById("story-list").innerHTML = placeholder;
+}
+
+// Nothing runs automatically — on load, on a field edit, or on a source
+// toggle. The tool only analyzes when Analyze is explicitly clicked.
 function runAnalysis() {
+  if (!validateFields()) { resetResultsDisplay(); return null; }
+  clearFieldErrors();
   const input = readInputs();
   const result = analyze(input);
   render(result, input);
   return result;
 }
 
-["in-pH","in-pco2","in-hco3gas","in-na","in-cl","in-k","in-hco3cmp","in-ca","in-alb"].forEach(id => {
-  els[id].addEventListener("input", runAnalysis);
+REQUIRED_FIELD_IDS.forEach(id => {
+  els[id].addEventListener("input", () => {
+    els[id].classList.remove("field-error");
+    if (!REQUIRED_FIELD_IDS.some(fid => els[fid].classList.contains("field-error"))) {
+      document.getElementById("missing-fields-callout").hidden = true;
+    }
+  });
 });
 document.getElementById("analyze-btn").addEventListener("click", runAnalysis);
+document.getElementById("reset-btn").addEventListener("click", () => {
+  REQUIRED_FIELD_IDS.forEach(id => { els[id].value = ""; });
+  document.getElementById("synthesis").value = "";
+  setSource("arterial");
+  clearFieldErrors();
+  resetResultsDisplay();
+});
 
 document.getElementById("copy-btn").addEventListener("click", () => {
+  if (!validateFields()) {
+    const c = document.getElementById("copy-confirm");
+    c.textContent = "Blocked — fill in every field and Analyze first.";
+    c.hidden = false;
+    setTimeout(() => { c.hidden = true; c.textContent = "Copied."; }, 2600);
+    return;
+  }
+  clearFieldErrors();
   const input = readInputs();
   const result = analyze(input);
   if (result.inconsistent) {
@@ -827,7 +956,7 @@ document.getElementById("copy-btn").addEventListener("click", () => {
   let lines = [];
   lines.push("STATE: " + result.state + " (pH " + result.pH.toFixed(2) + ")");
   lines.push("PROCESS: " + (result.noDisorder ? "no acid-base disorder identified" : result.processes.map(p => processTitle(p) + (p.duration ? " (" + p.duration + ")" : "")).join(" + ")));
-  lines.push("AG " + result.AG + " (expected normal ≈ " + result.expNormalAG + ", 3×albumin) | SID " + result.sid + " (" + result.sidClass + ") | corrected Ca " + result.correctedCa);
+  lines.push("AG " + result.AG + " (expected normal ≈ " + result.expNormalAG + ", 3×albumin) | SID " + result.sid + " (" + result.sidClass + ") | Lactate " + result.lactate + " mmol/L | corrected Ca " + result.correctedCa);
   const synthesis = document.getElementById("synthesis").value.trim();
   lines.push("STORY: " + (synthesis || "(not yet entered)"));
   const text = lines.join("\n");
@@ -925,5 +1054,6 @@ console.log("%cInterpret PaCO₂ in context of HCO3, then AG, then SID — Dr. S
 console.log("%cTry the Konami code (↑↑↓↓←→←→BA) somewhere on this page.", "font:12px 'IBM Plex Mono',monospace; color:#96601b;");
 
 /* ============================== INIT ============================== */
-runAnalysis();
+// Show the neutral placeholder state — analysis only runs when Analyze is clicked.
+resetResultsDisplay();
 </script>
